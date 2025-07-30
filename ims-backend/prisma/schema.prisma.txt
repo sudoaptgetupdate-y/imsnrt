@@ -1,0 +1,329 @@
+// ims-backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums ---
+enum ItemType {
+  SALE
+  ASSET
+}
+
+enum Role {
+  EMPLOYEE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ItemStatus {
+  IN_STOCK
+  SOLD
+  RESERVED
+  DEFECTIVE
+  BORROWED
+  IN_WAREHOUSE
+  ASSIGNED
+  DECOMMISSIONED
+  REPAIRING
+  RETURNED_TO_CUSTOMER
+}
+
+enum BorrowStatus {
+  BORROWED
+  RETURNED
+  OVERDUE
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  PARTIALLY_RETURNED
+  RETURNED
+}
+
+enum RepairStatus {
+  REPAIRING
+  PARTIALLY_RETURNED
+  COMPLETED
+}
+
+enum RepairOutcome {
+  REPAIRED_SUCCESSFULLY
+  UNREPAIRABLE
+}
+
+enum ItemOwner {
+  COMPANY
+  CUSTOMER
+}
+
+enum EventType {
+  CREATE
+  UPDATE
+  SALE
+  VOID
+  BORROW
+  RETURN_FROM_BORROW
+  ASSIGN
+  RETURN_FROM_ASSIGN
+  DECOMMISSION
+  REINSTATE
+  REPAIR_SENT
+  REPAIR_RETURNED
+}
+
+
+// --- Models ---
+model User {
+  id                    Int      @id @default(autoincrement())
+  username              String   @unique
+  email                 String   @unique
+  password              String
+  name                  String
+  role                  Role     @default(EMPLOYEE)
+  accountStatus         AccountStatus @default(ACTIVE)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdCategories     Category[]
+  createdBrands         Brand[]
+  createdProductModels  ProductModel[]
+  addedInventoryItems   InventoryItem[] @relation("AddedBy")
+  createdCustomers      Customer[]
+  salesMade             Sale[]
+  approvedBorrowings    Borrowing[]     @relation("ApprovedBorrowings")
+  voidedSales           Sale[]          @relation("VoidedSales")
+  
+  approvedAssignments   AssetAssignment[] @relation("ApprovedAssignments")
+  receivedAssignments   AssetAssignment[] @relation("ReceivedAssignments")
+  createdRepairs        Repair[]
+  
+  events                EventLog[]
+}
+
+model Customer {
+  id           Int      @id @default(autoincrement())
+  customerCode String   @unique
+  name         String
+  phone        String?
+  address      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  createdById  Int
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  sales        Sale[]
+  borrowings   Borrowing[]
+}
+
+model InventoryItem {
+  id                  Int                      @id @default(autoincrement())
+  itemType            ItemType                 @default(SALE)
+  ownerType           ItemOwner                @default(COMPANY)
+  assetCode           String?                  @unique
+  serialNumber        String?                  @unique
+  macAddress          String?                  @unique
+  status              ItemStatus               @default(IN_STOCK)
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  productModelId      Int
+  productModel        ProductModel             @relation(fields: [productModelId], references: [id])
+  addedById           Int
+  addedBy             User                     @relation("AddedBy", fields: [addedById], references: [id])
+  
+  assignmentRecords   AssetAssignmentOnItems[]
+  saleId              Int?
+  sale                Sale?                    @relation(fields: [saleId], references: [id])
+  borrowingRecords    BorrowingOnItems[]
+  repairRecords       RepairOnItems[]
+
+  eventLogs           EventLog[]
+
+  @@index([status])
+  @@index([itemType])
+  @@index([ownerType])
+}
+
+model Borrowing {
+  id           Int       @id @default(autoincrement())
+  borrowerId   Int
+  borrower     Customer  @relation(fields: [borrowerId], references: [id])
+  approvedById Int
+  approvedBy   User      @relation("ApprovedBorrowings", fields: [approvedById], references: [id])
+  borrowDate   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  dueDate      DateTime?
+  returnDate   DateTime?
+  notes        String?
+  status       BorrowStatus @default(BORROWED)
+  items        BorrowingOnItems[]
+}
+
+model BorrowingOnItems {
+  borrowingId     Int
+  borrowing       Borrowing @relation(fields: [borrowingId], references: [id])
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  assignedAt      DateTime @default(now())
+  returnedAt      DateTime?
+  @@id([borrowingId, inventoryItemId])
+}
+
+model Category {
+  id                   Int      @id @default(autoincrement())
+  name                 String   @unique
+  requiresMacAddress   Boolean  @default(true)
+  requiresSerialNumber Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdById          Int?
+  createdBy            User?    @relation(fields: [createdById], references: [id])
+  productModels        ProductModel[]
+}
+
+model Brand {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     Int?
+  createdBy       User?    @relation(fields: [createdById], references: [id])
+  productModels   ProductModel[]
+}
+
+model ProductModel {
+  id             Int      @id @default(autoincrement())
+  modelNumber    String
+  description    String?
+  sellingPrice   Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  categoryId     Int
+  category       Category @relation(fields: [categoryId], references: [id])
+  brandId        Int
+  brand          Brand    @relation(fields: [brandId], references: [id])
+  createdById    Int
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  inventoryItems InventoryItem[]
+  @@unique([modelNumber, brandId])
+}
+
+model Sale {
+  id         Int      @id @default(autoincrement())
+  saleDate   DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  subtotal   Float
+  vatAmount  Float
+  total      Float
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+  soldById   Int
+  soldBy     User     @relation(fields: [soldById], references: [id])
+  itemsSold  InventoryItem[]
+  status     SaleStatus @default(COMPLETED)
+  voidedAt   DateTime?
+  voidedById Int?
+  voidedBy   User?    @relation("VoidedSales", fields: [voidedById], references: [id])
+}
+
+model AssetAssignment {
+  id            Int                    @id @default(autoincrement())
+  assigneeId    Int
+  assignee      User                   @relation("ReceivedAssignments", fields: [assigneeId], references: [id])
+  approvedById  Int
+  approvedBy    User                   @relation("ApprovedAssignments", fields: [approvedById], references: [id])
+  assignedDate  DateTime               @default(now())
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @default(now()) @updatedAt
+  returnDate    DateTime?
+  notes         String?
+  status        AssignmentStatus       @default(ASSIGNED)
+  items         AssetAssignmentOnItems[]
+}
+
+model AssetAssignmentOnItems {
+  assignmentId    Int
+  assignment      AssetAssignment @relation(fields: [assignmentId], references: [id])
+  inventoryItemId Int
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  assignedAt      DateTime        @default(now())
+  returnedAt      DateTime?
+  @@id([assignmentId, inventoryItemId])
+}
+
+model Address {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique
+  contactPerson   String?
+  phone           String?
+  address         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  sentRepairs     Repair[] @relation("SentFrom")
+  receivedRepairs Repair[] @relation("SentTo")
+}
+
+model Repair {
+  id              Int      @id @default(autoincrement())
+  repairDate      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+  notes           String?
+  status          RepairStatus @default(REPAIRING)
+  
+  createdById     Int
+  createdBy       User     @relation(fields: [createdById], references: [id])
+  
+  senderId        Int
+  sender          Address  @relation("SentFrom", fields: [senderId], references: [id])
+  
+  receiverId      Int
+  receiver        Address  @relation("SentTo", fields: [receiverId], references: [id])
+  
+  items           RepairOnItems[]
+}
+
+model RepairOnItems {
+  repairId        Int
+  repair          Repair    @relation(fields: [repairId], references: [id])
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  
+  sentAt          DateTime  @default(now())
+  returnedAt      DateTime?
+  repairOutcome   RepairOutcome?
+  
+  @@id([repairId, inventoryItemId])
+}
+
+model EventLog {
+  id              Int       @id @default(autoincrement())
+  inventoryItemId Int
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  
+  userId          Int?
+  user            User?     @relation(fields: [userId], references: [id])
+  
+  eventType       EventType
+  details         Json      
+  createdAt       DateTime  @default(now())
+
+  @@index([inventoryItemId])
+  @@index([eventType])
+}

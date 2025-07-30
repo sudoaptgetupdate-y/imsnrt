@@ -1,0 +1,313 @@
+// src/pages/SaleDetailPage.jsx
+
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axiosInstance from '@/api/axiosInstance';
+import useAuthStore from "@/store/authStore";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ArrowLeft, FileText, AlertTriangle, Printer } from "lucide-react";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useTranslation } from "react-i18next";
+
+// --- แก้ไข PrintableHeaderCard ---
+const PrintableHeaderCard = ({ profile, sale, formattedSaleId, t }) => (
+    <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
+        <CardHeader className="text-center p-4">
+            {/* --- เพิ่มชื่อบริษัทตรงนี้ --- */}
+            <h1 className="text-lg font-bold">{profile.name}</h1> 
+            <p className="text-xs">{profile.addressLine1}</p>
+            <p className="text-xs">{profile.addressLine2}</p>
+            <p className="text-xs mt-2">{t('company_phone_label')}: {profile.phone} {t('company_tax_id_label')}: {profile.taxId}</p>
+        </CardHeader>
+        <CardContent className="p-2 border-y border-black">
+            <h2 className="text-md font-bold text-center tracking-widest">{t('printable_receipt_header')}</h2>
+        </CardContent>
+        <CardContent className="p-4">
+             <div className="grid grid-cols-2 gap-6 text-xs">
+                <div className="space-y-1">
+                    <p className="text-slate-600">{t('customer_label')}</p>
+                    <p className="font-semibold">{sale.customer.name}</p>
+                    <p className="text-slate-600">{sale.customer.address || ""}</p>
+                    <p className="text-slate-600">{t('phone')}. {sale.customer.phone || "-"}</p>
+                </div>
+                <div className="space-y-1 text-right">
+                    <p className="text-slate-600">{t('tableHeader_saleId')}</p>
+                    <p className="font-semibold">#{formattedSaleId}</p>
+                    <p className="text-slate-600">{t('tableHeader_date')}</p>
+                    <p className="font-semibold">{new Date(sale.saleDate).toLocaleString('th-TH')}</p>
+                    <p className="text-slate-600">{t('sold_by_label')}</p>
+                    <p className="font-semibold">{sale.soldBy.name}</p>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+);
+
+const PrintableItemsCard = ({ sale, t }) => (
+    // ... (ไม่มีการเปลี่ยนแปลงในส่วนนี้) ...
+    <Card className="hidden print:block mt-0 font-sarabun border-black rounded-t-none">
+        <CardContent className="p-0">
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b bg-muted/40">
+                            <th className="p-2 text-left">{t('tableHeader_category')}</th>
+                            <th className="p-2 text-left">{t('tableHeader_brand')}</th>
+                            <th className="p-2 text-left">{t('tableHeader_product')}</th>
+                            <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
+                            <th className="p-2 text-left">{t('tableHeader_macAddress')}</th>
+                            <th className="p-2 text-right">{t('tableHeader_price')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sale.itemsSold.map(item => (
+                            <tr key={item.id} className="border-b">
+                                <td className="p-2">{item.productModel.category.name}</td>
+                                <td className="p-2">{item.productModel.brand.name}</td>
+                                <td className="p-2">{item.productModel.modelNumber}</td>
+                                <td className="p-2">{item.serialNumber || 'N/A'}</td>
+                                <td className="p-2">{item.macAddress || 'N/A'}</td>
+                                <td className="p-2 text-right">{item.productModel.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        <tr className="border-t font-semibold">
+                            <td colSpan="5" className="p-2 text-right">{t('subtotal_label')}</td>
+                            <td className="p-2 text-right">{sale.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr className="border-t">
+                            <td colSpan="5" className="p-2 text-right">{t('vat_label')}</td>
+                            <td className="p-2 text-right">{sale.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr className="border-t text-base font-bold bg-muted/40">
+                            <td colSpan="5" className="p-2 text-right">{t('total_label')}</td>
+                            <td className="p-2 text-right">{sale.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </CardContent>
+    </Card>
+);
+
+
+export default function SaleDetailPage() {
+    // ... (ไม่มีการเปลี่ยนแปลงในส่วนนี้) ...
+    const { saleId } = useParams();
+    const navigate = useNavigate();
+    const { t } = useTranslation();
+    const token = useAuthStore((state) => state.token);
+    const currentUser = useAuthStore((state) => state.user);
+    const [sale, setSale] = useState(null);
+    const [companyProfile, setCompanyProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+
+    const canVoid = currentUser?.role === 'SUPER_ADMIN';
+
+    useEffect(() => {
+        const fetchAllData = async () => {
+            if (!saleId || !token) return;
+            try {
+                const [saleRes, profileRes] = await Promise.all([
+                    axiosInstance.get(`/sales/${saleId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    }),
+                    axiosInstance.get('/company-profile', {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
+                ]);
+                setSale(saleRes.data);
+                setCompanyProfile(profileRes.data);
+            } catch (error) {
+                toast.error("Failed to fetch page details.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchAllData();
+    }, [saleId, token]);
+
+    const handleVoidSale = async () => {
+        try {
+            await axiosInstance.patch(`/sales/${saleId}/void`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            toast.success("Sale has been voided successfully.");
+            const response = await axiosInstance.get(`/sales/${saleId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSale(response.data);
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Failed to void sale.");
+        } finally {
+            setIsAlertOpen(false);
+        }
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    if (loading || !sale || !companyProfile) return <p>Loading sale details...</p>;
+    
+    const formattedSaleId = sale.id.toString().padStart(6, '0');
+
+    return (
+        <div className="space-y-6">
+             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 no-print">
+                <div>
+                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                        <FileText className="h-6 w-6" /> 
+                        {t('sale_detail_title')}
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                        {t('sale_detail_description', { id: formattedSaleId })}
+                    </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button variant="outline" onClick={() => navigate('/sales')}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        {t('back_to_sales_list')}
+                    </Button>
+                    <Button variant="outline" onClick={handlePrint}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        {t('print_pdf')}
+                    </Button>
+                    {canVoid && sale.status === 'COMPLETED' && (
+                        <Button variant="destructive" onClick={() => setIsAlertOpen(true)}>
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            {t('void_sale_button')}
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            <div className="printable-area font-sarabun">
+                <PrintableHeaderCard profile={companyProfile} sale={sale} formattedSaleId={formattedSaleId} t={t} />
+                <PrintableItemsCard sale={sale} t={t} />
+                
+                <div className="no-print space-y-6">
+                    <Card className="p-4 sm:p-6 md:p-8">
+                        <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <p className="text-sm text-muted-foreground">{t('customer_label')}</p>
+                                <p className="font-semibold">{sale.customer.name}</p>
+                                <p className="text-sm text-muted-foreground">{sale.customer.address || ""}</p>
+                                <p className="text-sm text-muted-foreground">{t('phone')}. {sale.customer.phone || "-"}</p>
+                            </div>
+                            <div className="space-y-1 text-right">
+                                <p className="text-sm text-muted-foreground">{t('tableHeader_saleId')}</p>
+                                <p className="font-semibold">#{formattedSaleId}</p>
+                                <p className="text-sm text-muted-foreground">{t('tableHeader_date')}</p>
+                                <p className="font-semibold">{new Date(sale.saleDate).toLocaleString('th-TH')}</p>
+                                <p className="text-sm text-muted-foreground">{t('sold_by_label')}</p>
+                                <p className="font-semibold">{sale.soldBy.name}</p>
+                            </div>
+                        </div>
+                         <div className="mt-4 flex justify-end">
+                            <StatusBadge status={sale.status} className="w-28 text-base" />
+                        </div>
+                    </Card>
+
+                    {sale.status === 'VOIDED' && (
+                        <Card className="border-red-500 bg-red-50/50">
+                            <CardHeader>
+                                <CardTitle className="text-red-600 text-base">{t('void_info_title')}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-2 gap-4 text-sm pb-4">
+                                <div><p className="font-semibold">{t('voided_by_label')}</p><p>{sale.voidedBy?.name || 'N/A'}</p></div>
+                                <div><p className="font-semibold">{t('voided_date_label')}</p><p>{new Date(sale.voidedAt).toLocaleString()}</p></div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Card>
+                        <CardContent className="p-0">
+                            <div className="border rounded-lg overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b bg-muted/40">
+                                            <th className="p-2 text-left">{t('tableHeader_category')}</th>
+                                            <th className="p-2 text-left">{t('tableHeader_brand')}</th>
+                                            <th className="p-2 text-left">{t('tableHeader_product')}</th>
+                                            <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
+                                            <th className="p-2 text-left">{t('tableHeader_macAddress')}</th>
+                                            <th className="p-2 text-right">{t('tableHeader_price')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sale.itemsSold.map(item => (
+                                            <tr key={item.id} className="border-b">
+                                                <td className="p-2">{item.productModel.category.name}</td>
+                                                <td className="p-2">{item.productModel.brand.name}</td>
+                                                <td className="p-2">{item.productModel.modelNumber}</td>
+                                                <td className="p-2">{item.serialNumber || 'N/A'}</td>
+                                                <td className="p-2">{item.macAddress || 'N/A'}</td>
+                                                <td className="p-2 text-right">{item.productModel.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="border-t font-semibold">
+                                            <td colSpan="5" className="p-2 text-right">{t('subtotal_label')}</td>
+                                            <td className="p-2 text-right">{sale.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        </tr>
+                                        <tr className="border-t">
+                                            <td colSpan="5" className="p-2 text-right">{t('vat_label')}</td>
+                                            <td className="p-2 text-right">{sale.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                        </tr>
+                                        <tr className="border-t text-base font-bold bg-muted/40">
+                                            <td colSpan="5" className="p-2 text-right">{t('total_label')}</td>
+                                            <td className="p-2 text-right">{sale.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} THB</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+                
+                <div className="signature-section hidden">
+                    <div className="signature-box">
+                        <div className="signature-line"></div>
+                        <p>( {sale.soldBy.name} )</p>
+                        <p>{t('signature_seller')}</p>
+                    </div>
+                    <div className="signature-box">
+                        <div className="signature-line"></div>
+                        <p>( {sale.customer.name} )</p>
+                        <p>{t('signature_buyer')}</p>
+                    </div>
+                </div>
+
+                <div className="print-footer hidden text-center text-xs text-muted-foreground mt-8">
+                     <p>{t('thank_you_message_1')}</p>
+                     <p>{t('thank_you_message_2')}</p>
+                </div>
+            </div>
+
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{t('void_dialog_title')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {t('void_dialog_description', { id: sale.id })}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleVoidSale}>{t('continue')}</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+    );
+}
