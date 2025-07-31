@@ -592,5 +592,7 @@
   "supplier_form_phone_label": "เบอร์โทรศัพท์",
   "supplier_form_address_label": "ที่อยู่",
   "success_supplier_updated": "อัปเดตข้อมูลผู้จัดจำหน่ายเรียบร้อยแล้ว",
-  "success_supplier_created": "สร้างข้อมูลผู้จัดจำหน่ายใหม่เรียบร้อยแล้ว"
+  "success_supplier_created": "สร้างข้อมูลผู้จัดจำหน่ายใหม่เรียบร้อยแล้ว",
+  "item_history_description_title": "รายละเอียดและข้อมูลจำเพาะของรายการที่เลือก",
+  "company_profile": "ข้อมูลบริษัท"
 }

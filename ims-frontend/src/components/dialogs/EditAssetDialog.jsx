@@ -8,55 +8,51 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { toast } from 'sonner';
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { useTranslation } from "react-i18next";
+import { SupplierCombobox } from "../ui/SupplierCombobox"; // Assuming you have this component
 
-export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) {
-    const { t } = useTranslation(); // --- 2. เรียกใช้ useTranslation ---
+export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
+    const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
     const [formData, setFormData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    
     const [selectedModelInfo, setSelectedModelInfo] = useState(null);
+    const [initialSupplier, setInitialSupplier] = useState(null);
+    const [isMacRequired, setIsMacRequired] = useState(true);
+    const [isSerialRequired, setIsSerialRequired] = useState(true);
 
     useEffect(() => {
-        if (assetId && isOpen) {
-            const fetchAsset = async () => {
-                setLoading(true);
-                try {
-                    const response = await axiosInstance.get(`/assets/${assetId}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const assetData = response.data;
-                    setFormData({
-                        productModelId: assetData.productModelId,
-                        assetCode: assetData.assetCode,
-                        serialNumber: assetData.serialNumber || '',
-                        macAddress: assetData.macAddress || '',
-                        status: assetData.status,
-                        notes: assetData.notes || '',
-                    });
-                    setSelectedModelInfo(assetData.productModel); 
-                } catch (error) {
-                    toast.error(t('error_fetch_asset')); // --- 3. แปลข้อความ ---
-                    setIsOpen(false);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchAsset();
+        if (asset) {
+            setFormData({
+                productModelId: asset.productModelId,
+                assetCode: asset.assetCode,
+                serialNumber: asset.serialNumber || '',
+                macAddress: asset.macAddress || '',
+                status: asset.status,
+                notes: asset.notes || '',
+                supplierId: asset.supplierId || "",
+            });
+            setSelectedModelInfo(asset.productModel);
+            setInitialSupplier(asset.supplier);
+            setIsMacRequired(asset.productModel.category.requiresMacAddress);
+            setIsSerialRequired(asset.productModel.category.requiresSerialNumber);
         }
-    }, [assetId, isOpen, token, t, setIsOpen]);
+    }, [asset]);
 
     const handleModelSelect = (model) => {
         if (model) {
             setFormData(prev => ({ ...prev, productModelId: model.id }));
             setSelectedModelInfo(model);
+            setIsMacRequired(model.category.requiresMacAddress);
+            setIsSerialRequired(model.category.requiresSerialNumber);
         }
+    };
+    
+    const handleSupplierSelect = (supplierId) => {
+        setFormData(prev => ({...prev, supplierId: supplierId}));
     };
 
     const handleInputChange = (e) => {
@@ -71,10 +67,10 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            await axiosInstance.put(`/assets/${assetId}`, formData, {
+            await axiosInstance.put(`/assets/${asset.id}`, formData, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            toast.success(t('success_asset_updated')); // --- 3. แปลข้อความ ---
+            toast.success(t('success_asset_updated'));
             onSave();
             setIsOpen(false);
         } catch (error) {
@@ -86,13 +82,12 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    {/* --- 3. แปลข้อความ --- */}
                     <DialogTitle>{t('edit_asset_dialog_title')}</DialogTitle>
                     <DialogDescription>{t('edit_asset_dialog_description')}</DialogDescription>
                 </DialogHeader>
-                {loading ? (
+                {!formData ? (
                     <p>{t('loading_asset')}</p>
-                ) : formData ? (
+                ) : (
                     <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-2">
@@ -117,6 +112,15 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
                                </Select>
                            </div>
                         </div>
+                        
+                        <div className="space-y-2">
+                           <Label>{t('supplier_label')}</Label>
+                           <SupplierCombobox
+                                selectedValue={formData.supplierId}
+                                onSelect={handleSupplierSelect}
+                                initialSupplier={initialSupplier}
+                           />
+                        </div>
 
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -124,19 +128,14 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
                                 <Input id="assetCode" value={formData.assetCode} onChange={handleInputChange} required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="serialNumber">{t('serial_number_label')}</Label>
-                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleInputChange} />
+                                <Label htmlFor="serialNumber">{t('serial_number_label')} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
+                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleInputChange} disabled={!isSerialRequired} />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="macAddress">{t('mac_address_label')}</Label>
-                            <Input id="macAddress" value={formData.macAddress} onChange={handleInputChange} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">{t('notes_label')}</Label>
-                            <Textarea id="notes" value={formData.notes} onChange={handleInputChange} />
+                            <Label htmlFor="macAddress">{t('mac_address_label')} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
+                            <Input id="macAddress" value={formData.macAddress} onChange={handleInputChange} disabled={!isMacRequired} />
                         </div>
                         
                         <DialogFooter>
@@ -144,7 +143,7 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
                             <Button type="submit">{t('save_asset_button')}</Button>
                         </DialogFooter>
                     </form>
-                ) : null}
+                )}
             </DialogContent>
         </Dialog>
     );

@@ -72,7 +72,7 @@ export default function AssetPage() {
         handleFilterChange,
         refreshData
     } = usePaginatedFetch("/assets", 10, {
-        status: "All",
+        status: "IN_WAREHOUSE",
         categoryId: "All",
         brandId: "All"
     });
@@ -236,52 +236,56 @@ export default function AssetPage() {
                                                 <DropdownMenuItem onClick={() => navigate(`/assets/${asset.id}/history`)}>
                                                     <History className="mr-2 h-4 w-4" /> {t('action_view_history')}
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => openEditDialog(asset)}>
-                                                    <Edit className="mr-2 h-4 w-4" /> {t('action_edit_asset')}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => handleAssignItem(asset)}
-                                                    disabled={asset.status !== 'IN_WAREHOUSE'}
-                                                >
-                                                    <ArrowRightLeft className="mr-2 h-4 w-4" /> {t('action_assign_asset')}
-                                                </DropdownMenuItem>
-                                                
-                                                {asset.status === 'IN_WAREHOUSE' && (
-                                                    <DropdownMenuItem className="text-orange-600 focus:text-orange-500" onClick={() => handleStatusChange(asset.id, 'defect', 'Asset marked as DEFECTIVE.')}>
-                                                        <ShieldAlert className="mr-2 h-4 w-4" /> {t('action_mark_defective')}
-                                                    </DropdownMenuItem>
-                                                )}
+                                                {canManage && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => openEditDialog(asset)}>
+                                                            <Edit className="mr-2 h-4 w-4" /> {t('action_edit_asset')}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onClick={() => handleAssignItem(asset)}
+                                                            disabled={asset.status !== 'IN_WAREHOUSE'}
+                                                        >
+                                                            <ArrowRightLeft className="mr-2 h-4 w-4" /> {t('action_assign_asset')}
+                                                        </DropdownMenuItem>
+                                                        
+                                                        {asset.status === 'IN_WAREHOUSE' && (
+                                                            <DropdownMenuItem className="text-orange-600 focus:text-orange-500" onClick={() => handleStatusChange(asset.id, 'defect', 'Asset marked as DEFECTIVE.')}>
+                                                                <ShieldAlert className="mr-2 h-4 w-4" /> {t('action_mark_defective')}
+                                                            </DropdownMenuItem>
+                                                        )}
 
-                                                {asset.status === 'DEFECTIVE' && (
-                                                    <DropdownMenuItem className="text-green-600 focus:text-green-500" onClick={() => handleStatusChange(asset.id, 'in-warehouse', 'Asset is now IN WAREHOUSE.')}>
-                                                        <ShieldCheck className="mr-2 h-4 w-4" /> Mark as In Warehouse
-                                                    </DropdownMenuItem>
-                                                )}
+                                                        {asset.status === 'DEFECTIVE' && (
+                                                            <DropdownMenuItem className="text-green-600 focus:text-green-500" onClick={() => handleStatusChange(asset.id, 'in-warehouse', 'Asset is now IN WAREHOUSE.')}>
+                                                                <ShieldCheck className="mr-2 h-4 w-4" /> Mark as In Warehouse
+                                                            </DropdownMenuItem>
+                                                        )}
 
-                                                {asset.status === 'DECOMMISSIONED' ? (
-                                                    <DropdownMenuItem className="text-green-600 focus:text-green-500" onClick={() => handleStatusChange(asset.id, 'reinstate', 'Asset has been reinstated.')}>
-                                                        <ArchiveRestore className="mr-2 h-4 w-4" /> {t('action_reinstate')}
-                                                    </DropdownMenuItem>
-                                                ) : (
-                                                    <DropdownMenuItem
-                                                        className="text-red-600 focus:text-red-500"
-                                                        onSelect={(e) => e.preventDefault()}
-                                                        disabled={!['IN_WAREHOUSE', 'DEFECTIVE'].includes(asset.status)}
-                                                        onClick={() => handleStatusChange(asset.id, 'decommission', 'Asset has been decommissioned.')}
-                                                    >
-                                                        <Archive className="mr-2 h-4 w-4" /> {t('action_decommission')}
-                                                    </DropdownMenuItem>
-                                                )}
+                                                        {asset.status === 'DECOMMISSIONED' ? (
+                                                            <DropdownMenuItem className="text-green-600 focus:text-green-500" onClick={() => handleStatusChange(asset.id, 'reinstate', 'Asset has been reinstated.')}>
+                                                                <ArchiveRestore className="mr-2 h-4 w-4" /> {t('action_reinstate')}
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem
+                                                                className="text-red-600 focus:text-red-500"
+                                                                onSelect={(e) => e.preventDefault()}
+                                                                disabled={!['IN_WAREHOUSE', 'DEFECTIVE'].includes(asset.status)}
+                                                                onClick={() => handleStatusChange(asset.id, 'decommission', 'Asset has been decommissioned.')}
+                                                            >
+                                                                <Archive className="mr-2 h-4 w-4" /> {t('action_decommission')}
+                                                            </DropdownMenuItem>
+                                                        )}
 
-                                                <DropdownMenuItem
-                                                    className="text-red-600 focus:text-red-500"
-                                                    onSelect={(e) => e.preventDefault()}
-                                                    disabled={asset.status === 'ASSIGNED' || asset.status === 'REPAIRING'}
-                                                    onClick={() => setAssetToDelete(asset)}
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" /> {t('delete')}
-                                                </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            className="text-red-600 focus:text-red-500"
+                                                            onSelect={(e) => e.preventDefault()}
+                                                            disabled={asset.status === 'ASSIGNED' || asset.status === 'REPAIRING'}
+                                                            onClick={() => setAssetToDelete(asset)}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" /> {t('delete')}
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>

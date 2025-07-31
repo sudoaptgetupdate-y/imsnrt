@@ -87,7 +87,7 @@ export default function InventoryPage() {
         sortBy, sortOrder, handleSortChange,
         handleSearchChange, handlePageChange, handleItemsPerPageChange, handleFilterChange, refreshData
     } = usePaginatedFetch("/inventory", 10, {
-        status: initialStatus,
+        status: "IN_STOCK",
         categoryId: "All",
         brandId: "All"
     });
@@ -332,21 +332,21 @@ export default function InventoryPage() {
                                                     >
                                                         <View className="mr-2 h-4 w-4" /> {t('details')}
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleSellItem(item)}
-                                                        disabled={item.status !== 'IN_STOCK'}
-                                                    >
-                                                        <ShoppingCart className="mr-2 h-4 w-4" /> {t('action_sell')}
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem
-                                                        onClick={() => handleBorrowItem(item)}
-                                                        disabled={item.status !== 'IN_STOCK'}
-                                                    >
-                                                        <ArrowRightLeft className="mr-2 h-4 w-4" /> {t('action_borrow')}
-                                                    </DropdownMenuItem>
                                                     {canManage && (
                                                         <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleSellItem(item)}
+                                                                disabled={item.status !== 'IN_STOCK'}
+                                                            >
+                                                                <ShoppingCart className="mr-2 h-4 w-4" /> {t('action_sell')}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleBorrowItem(item)}
+                                                                disabled={item.status !== 'IN_STOCK'}
+                                                            >
+                                                                <ArrowRightLeft className="mr-2 h-4 w-4" /> {t('action_borrow')}
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 onClick={() => openEditDialog(item)}

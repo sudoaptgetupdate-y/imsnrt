@@ -142,7 +142,6 @@ const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) =
     );
 };
 
-// --- START: แก้ไขส่วนนี้ ---
 const PrintableHeaderCard = ({ assignment, formattedAssignmentId, t, profile }) => (
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
@@ -208,14 +207,14 @@ const PrintableItemsCard = ({ assignment, t }) => (
         </CardContent>
     </Card>
 );
-// --- END: แก้ไขส่วนนี้ ---
-
 
 export default function AssetAssignmentDetailPage() {
     const { assignmentId } = useParams();
     const navigate = useNavigate();
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
+    const { user: currentUser } = useAuthStore((state) => state);
+    const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
     const [assignment, setAssignment] = useState(null);
     const [companyProfile, setCompanyProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -289,7 +288,7 @@ export default function AssetAssignmentDetailPage() {
                             <Printer className="mr-2 h-4 w-4" />
                             {t('print_pdf')}
                         </Button>
-                        {itemsToReturn.length > 0 && (
+                        {canManage && itemsToReturn.length > 0 && (
                             <Button onClick={() => setIsReturnDialogOpen(true)}>
                                 <CornerDownLeft className="mr-2" /> {t('receive_returned_assets')}
                             </Button>

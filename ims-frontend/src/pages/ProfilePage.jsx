@@ -13,8 +13,9 @@ import { useNavigate } from 'react-router-dom';
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from 'react-i18next';
 // --- START: 1. Import ไอคอน ---
-import { User, Lock, Package } from 'lucide-react';
+import { User, Lock, Package, Eye, EyeOff } from 'lucide-react';
 // --- END ---
+
 
 const SkeletonRow = () => (
     <tr className="border-b">
@@ -53,13 +54,11 @@ const MyAssetsTab = () => {
     return (
         <Card>
             <CardHeader>
-                {/* --- START: 2. ปรับปรุง CardHeader --- */}
                 <CardTitle className="flex items-center gap-2">
                     <Package className="h-6 w-6" />
                     {t('my_assets')}
                 </CardTitle>
                 <CardDescription className="mt-1">{t('my_assets_description')}</CardDescription>
-                {/* --- END --- */}
             </CardHeader>
             <CardContent>
                 <div className="border rounded-lg overflow-x-auto">
@@ -114,6 +113,12 @@ export default function ProfilePage() {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+    
+    // --- START: เพิ่ม State สำหรับการแสดงผลรหัสผ่าน ---
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    // --- END ---
 
     useEffect(() => {
         if (user) {
@@ -143,11 +148,11 @@ export default function ProfilePage() {
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
         if (newPassword !== confirmPassword) {
-            toast.error("New password and confirmation do not match.");
+            toast.error(t('password_mismatch_error'));
             return;
         }
         if (newPassword.length < 6) {
-             toast.error("New password must be at least 6 characters long.");
+             toast.error(t('password_length_error'));
             return;
         }
 
@@ -179,13 +184,11 @@ export default function ProfilePage() {
             <TabsContent value="profile">
                 <Card>
                     <CardHeader>
-                        {/* --- START: 3. ปรับปรุง CardHeader --- */}
                         <CardTitle className="flex items-center gap-2">
                            <User className="h-6 w-6" />
                            {t('my_profile_title')}
                         </CardTitle>
                         <CardDescription className="mt-1">{t('my_profile_description')}</CardDescription>
-                        {/* --- END --- */}
                     </CardHeader>
                     <form onSubmit={handleProfileSubmit}>
                         <CardContent className="space-y-4">
@@ -202,19 +205,62 @@ export default function ProfilePage() {
             <TabsContent value="password">
                 <Card>
                     <CardHeader>
-                        {/* --- START: 4. ปรับปรุง CardHeader --- */}
                         <CardTitle className="flex items-center gap-2">
                             <Lock className="h-6 w-6" />
                             {t('change_password')}
                         </CardTitle>
                         <CardDescription className="mt-1">{t('change_password_description')}</CardDescription>
-                        {/* --- END --- */}
                     </CardHeader>
                     <form onSubmit={handlePasswordSubmit}>
                         <CardContent className="space-y-4">
-                             <div className="space-y-2"><Label htmlFor="currentPassword">{t('change_password_current')}</Label><Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
-                             <div className="space-y-2"><Label htmlFor="newPassword">{t('change_password_new')}</Label><Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required /></div>
-                             <div className="space-y-2"><Label htmlFor="confirmPassword">{t('change_password_confirm')}</Label><Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
+                             {/* --- START: ปรับปรุง Current Password Input --- */}
+                             <div className="space-y-2 relative">
+                                <Label htmlFor="currentPassword">{t('change_password_current')}</Label>
+                                <Input 
+                                    id="currentPassword" 
+                                    type={showCurrentPassword ? 'text' : 'password'} 
+                                    value={currentPassword} 
+                                    onChange={(e) => setCurrentPassword(e.target.value)} 
+                                    required 
+                                    className="pr-10"
+                                />
+                                <Button type="button" variant="ghost" size="icon" className="absolute bottom-1 right-1 h-7 w-7" onClick={() => setShowCurrentPassword(prev => !prev)}>
+                                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                             </div>
+                             {/* --- END --- */}
+                             {/* --- START: ปรับปรุง New Password Input --- */}
+                             <div className="space-y-2 relative">
+                                <Label htmlFor="newPassword">{t('change_password_new')}</Label>
+                                <Input 
+                                    id="newPassword" 
+                                    type={showNewPassword ? 'text' : 'password'} 
+                                    value={newPassword} 
+                                    onChange={(e) => setNewPassword(e.target.value)} 
+                                    required 
+                                    className="pr-10"
+                                />
+                                 <Button type="button" variant="ghost" size="icon" className="absolute bottom-1 right-1 h-7 w-7" onClick={() => setShowNewPassword(prev => !prev)}>
+                                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                             </div>
+                             {/* --- END --- */}
+                             {/* --- START: ปรับปรุง Confirm Password Input --- */}
+                             <div className="space-y-2 relative">
+                                <Label htmlFor="confirmPassword">{t('change_password_confirm')}</Label>
+                                <Input 
+                                    id="confirmPassword" 
+                                    type={showConfirmPassword ? 'text' : 'password'} 
+                                    value={confirmPassword} 
+                                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                                    required
+                                    className="pr-10"
+                                />
+                                <Button type="button" variant="ghost" size="icon" className="absolute bottom-1 right-1 h-7 w-7" onClick={() => setShowConfirmPassword(prev => !prev)}>
+                                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                             </div>
+                             {/* --- END --- */}
                         </CardContent>
                         <CardFooter><Button type="submit" disabled={isPasswordLoading}>{isPasswordLoading ? t('profile_saving') : t('change_password')}</Button></CardFooter>
                     </form>

@@ -25,7 +25,9 @@ import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
 import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { BrandCombobox } from "@/components/ui/BrandCombobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
+const NOTE_MAX_LENGTH = 191; // กำหนดความยาวสูงสุดให้ตรงกับฐานข้อมูล
 
 export default function CreateSalePage() {
     const { t } = useTranslation();
@@ -35,10 +37,9 @@ export default function CreateSalePage() {
 
     const [selectedCustomerId, setSelectedCustomerId] = useState("");
     const [selectedItems, setSelectedItems] = useState([]);
+    const [notes, setNotes] = useState("");
 
-    // --- START: สร้าง excludeIds จาก selectedItems ---
     const excludeIds = selectedItems.map(item => item.id);
-    // --- END ---
 
     const {
         data: availableItems,
@@ -51,10 +52,10 @@ export default function CreateSalePage() {
         handleItemsPerPageChange,
         handleFilterChange
     } = usePaginatedFetch(
-        "/inventory", 
-        10, 
+        "/inventory",
+        10,
         { status: "IN_STOCK", categoryId: "All", brandId: "All" },
-        excludeIds // --- START: ส่ง excludeIds ไปให้ Hook ---
+        excludeIds
     );
 
     useEffect(() => {
@@ -83,10 +84,15 @@ export default function CreateSalePage() {
             toast.error("Please add at least one item to the sale.");
             return;
         }
+        if (notes && notes.length > NOTE_MAX_LENGTH) {
+            toast.error(`Notes cannot exceed ${NOTE_MAX_LENGTH} characters.`);
+            return;
+        }
 
         const payload = {
             customerId: parseInt(selectedCustomerId),
             inventoryItemIds: selectedItems.map(item => item.id),
+            notes: notes,
         };
 
         try {
@@ -104,9 +110,7 @@ export default function CreateSalePage() {
     const vat = subtotal * 0.07;
     const total = subtotal + vat;
 
-    // --- START: ไม่ต้องกรองข้อมูลซ้ำซ้อนใน Frontend ---
     const displayedAvailableItems = availableItems;
-    // --- END ---
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -136,9 +140,7 @@ export default function CreateSalePage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    {/* --- START: ADDED CATEGORY HEADER --- */}
                                     <TableHead>{t('tableHeader_category')}</TableHead>
-                                    {/* --- END: ADDED CATEGORY HEADER --- */}
                                     <TableHead>{t('tableHeader_brand')}</TableHead>
                                     <TableHead>{t('tableHeader_productModel')}</TableHead>
                                     <TableHead>{t('tableHeader_serialNumber')}</TableHead>
@@ -152,9 +154,7 @@ export default function CreateSalePage() {
                                 ) : displayedAvailableItems.length > 0 ? (
                                     displayedAvailableItems.map(item => (
                                     <TableRow key={item.id}>
-                                        {/* --- START: ADDED CATEGORY CELL --- */}
                                         <TableCell>{item.productModel.category.name}</TableCell>
-                                        {/* --- END: ADDED CATEGORY CELL --- */}
                                         <TableCell>{item.productModel.brand.name}</TableCell>
                                         <TableCell>{item.productModel.modelNumber}</TableCell>
                                         <TableCell>{item.serialNumber || '-'}</TableCell>
@@ -198,6 +198,18 @@ export default function CreateSalePage() {
                     <div className="space-y-2">
                         <Label>{t('createSale_customer_label')}</Label>
                         <CustomerCombobox selectedValue={selectedCustomerId} onSelect={setSelectedCustomerId} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="notes">{t('notes')}</Label>
+                        <Textarea
+                            id="notes"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Add notes for this sale..."
+                        />
+                        <p className={`text-xs text-right ${notes.length > NOTE_MAX_LENGTH ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {notes.length} / {NOTE_MAX_LENGTH}
+                        </p>
                     </div>
                     <Separator />
                     <div className="space-y-2">

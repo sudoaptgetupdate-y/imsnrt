@@ -82,6 +82,7 @@ const MainLayout = () => {
     const logout = useAuthStore((state) => state.logout);
     const currentUser = useAuthStore((state) => state.user);
     const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+    const isAdmin = currentUser?.role === 'ADMIN' || isSuperAdmin;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -138,7 +139,9 @@ const MainLayout = () => {
             
             <nav ref={navRef} className="sidebar-nav h-[calc(100vh-65px)] px-3 py-4 space-y-1.5 overflow-y-auto">
                  <NavItem to="/dashboard" icon={<Boxes size={18} />} text={t('dashboard')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                <NavItem to="/reports/sales" icon={<BarChart2 size={18}/>} text="Reports" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                {isAdmin && (
+                    <NavItem to="/reports/sales" icon={<BarChart2 size={18}/>} text="Reports" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                )}
                 <div>
                     <p className={cn("px-3 mt-4 mb-2 text-slate-400 text-xs font-semibold uppercase tracking-wider", isSidebarCollapsed && "text-center")}>
                         {isSidebarCollapsed ? 'T' : 'Transactions'}
@@ -174,7 +177,7 @@ const MainLayout = () => {
                         </p>
                         <div className="space-y-1">
                             <NavItem to="/users" icon={<Settings size={18}/>} text={t('userManagement')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                            <NavItem to="/company-profile" icon={<Building size={18}/>} text="Company Profile" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                            <NavItem to="/company-profile" icon={<Building size={18}/>} text={t('company_profile')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         </div>
                     </div>
                 )}

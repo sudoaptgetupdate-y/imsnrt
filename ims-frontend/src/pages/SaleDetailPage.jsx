@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// --- START: แก้ไขตรงนี้ ---
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// --- END: แก้ไขตรงนี้ ---
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, AlertTriangle, Printer } from "lucide-react";
@@ -15,12 +17,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTranslation } from "react-i18next";
 
-// --- แก้ไข PrintableHeaderCard ---
 const PrintableHeaderCard = ({ profile, sale, formattedSaleId, t }) => (
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
-            {/* --- เพิ่มชื่อบริษัทตรงนี้ --- */}
-            <h1 className="text-lg font-bold">{profile.name}</h1> 
+            <h1 className="text-lg font-bold">{profile.name}</h1>
             <p className="text-xs">{profile.addressLine1}</p>
             <p className="text-xs">{profile.addressLine2}</p>
             <p className="text-xs mt-2">{t('company_phone_label')}: {profile.phone} {t('company_tax_id_label')}: {profile.taxId}</p>
@@ -45,12 +45,17 @@ const PrintableHeaderCard = ({ profile, sale, formattedSaleId, t }) => (
                     <p className="font-semibold">{sale.soldBy.name}</p>
                 </div>
             </div>
+            {sale.notes && (
+                <div className="mt-4">
+                    <p className="font-semibold text-xs">{t('notes')}:</p>
+                    <p className="whitespace-pre-wrap text-xs text-slate-700 border p-2 rounded-md bg-slate-50">{sale.notes}</p>
+                </div>
+            )}
         </CardContent>
     </Card>
 );
 
 const PrintableItemsCard = ({ sale, t }) => (
-    // ... (ไม่มีการเปลี่ยนแปลงในส่วนนี้) ...
     <Card className="hidden print:block mt-0 font-sarabun border-black rounded-t-none">
         <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -97,9 +102,7 @@ const PrintableItemsCard = ({ sale, t }) => (
     </Card>
 );
 
-
 export default function SaleDetailPage() {
-    // ... (ไม่มีการเปลี่ยนแปลงในส่วนนี้) ...
     const { saleId } = useParams();
     const navigate = useNavigate();
     const { t } = useTranslation();
@@ -195,26 +198,38 @@ export default function SaleDetailPage() {
                 <PrintableItemsCard sale={sale} t={t} />
                 
                 <div className="no-print space-y-6">
-                    <Card className="p-4 sm:p-6 md:p-8">
-                        <div className="grid grid-cols-2 gap-6">
-                            <div className="space-y-1">
-                                <p className="text-sm text-muted-foreground">{t('customer_label')}</p>
-                                <p className="font-semibold">{sale.customer.name}</p>
-                                <p className="text-sm text-muted-foreground">{sale.customer.address || ""}</p>
-                                <p className="text-sm text-muted-foreground">{t('phone')}. {sale.customer.phone || "-"}</p>
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                 <div>
+                                    <CardTitle>Sale Details</CardTitle>
+                                    <CardDescription>Record ID #{formattedSaleId}</CardDescription>
+                                </div>
+                                 <StatusBadge status={sale.status} className="w-28 text-base"/>
                             </div>
-                            <div className="space-y-1 text-right">
-                                <p className="text-sm text-muted-foreground">{t('tableHeader_saleId')}</p>
-                                <p className="font-semibold">#{formattedSaleId}</p>
-                                <p className="text-sm text-muted-foreground">{t('tableHeader_date')}</p>
-                                <p className="font-semibold">{new Date(sale.saleDate).toLocaleString('th-TH')}</p>
-                                <p className="text-sm text-muted-foreground">{t('sold_by_label')}</p>
-                                <p className="font-semibold">{sale.soldBy.name}</p>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">{t('customer_label')}</p>
+                                    <p>{sale.customer.name}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">{t('tableHeader_saleDate')}</p>
+                                    <p>{new Date(sale.saleDate).toLocaleString()}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">{t('sold_by_label')}</p>
+                                    <p>{sale.soldBy.name}</p>
+                                </div>
                             </div>
-                        </div>
-                         <div className="mt-4 flex justify-end">
-                            <StatusBadge status={sale.status} className="w-28 text-base" />
-                        </div>
+                            {sale.notes && (
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium text-muted-foreground">{t('notes')}</p>
+                                    <p className="whitespace-pre-wrap text-sm border p-3 rounded-md bg-muted/30">{sale.notes}</p>
+                                </div>
+                            )}
+                        </CardContent>
                     </Card>
 
                     {sale.status === 'VOIDED' && (

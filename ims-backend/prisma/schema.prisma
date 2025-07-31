@@ -256,6 +256,7 @@ model Sale {
   subtotal   Float
   vatAmount  Float
   total      Float
+  notes      String?
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
   soldById   Int

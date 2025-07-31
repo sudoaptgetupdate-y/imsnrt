@@ -1,4 +1,5 @@
-// controllers/saleController.js
+// ims-backend/controllers/saleController.js
+
 const prisma = require('../prisma/client');
 const { EventType } = require('@prisma/client');
 const saleController = {};
@@ -10,7 +11,7 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 };
 
 saleController.createSale = async (req, res, next) => {
-    const { customerId, inventoryItemIds } = req.body;
+    const { customerId, inventoryItemIds, notes } = req.body; // 1. รับค่า notes จาก request
     const soldById = req.user.id; 
 
     const parsedCustomerId = parseInt(customerId, 10);
@@ -20,7 +21,6 @@ saleController.createSale = async (req, res, next) => {
         return next(err);
     }
     
-    // ... (the rest of the function)
     if (!Array.isArray(inventoryItemIds) || inventoryItemIds.length === 0 || inventoryItemIds.some(id => typeof id !== 'number')) {
         const err = new Error('inventoryItemIds must be a non-empty array of numbers.');
         err.statusCode = 400;
@@ -61,6 +61,7 @@ saleController.createSale = async (req, res, next) => {
                     subtotal,
                     vatAmount,
                     total,
+                    notes, // 2. เพิ่ม notes ตอนสร้าง sale
                 },
             });
 
@@ -100,7 +101,6 @@ saleController.createSale = async (req, res, next) => {
     }
 };
 
-// ... (rest of the file is correct)
 saleController.getAllSales = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -232,15 +232,12 @@ saleController.voidSale = async (req, res, next) => {
             const itemIdsToUpdate = saleToVoid.itemsSold.map(item => item.id);
 
             if (itemIdsToUpdate.length > 0) {
-                // *** START: CORRECTED LOGIC ***
-                // We ONLY update the status, but keep the saleId for historical tracking.
                 await tx.inventoryItem.updateMany({
                     where: { id: { in: itemIdsToUpdate } },
                     data: {
                         status: 'IN_STOCK' 
                     },
                 });
-                // *** END: CORRECTED LOGIC ***
 
                 for (const itemId of itemIdsToUpdate) {
                     await createEventLog(
@@ -267,98 +264,6 @@ saleController.voidSale = async (req, res, next) => {
         });
 
         res.status(200).json({ message: 'Sale has been voided successfully.', sale: voidedSale });
-
-    } catch (error) {
-        next(error);
-    }
-};
-
-saleController.updateSale = async (req, res, next) => {
-    const { id } = req.params;
-    const { customerId, inventoryItemIds } = req.body;
-    const actorId = req.user.id;
-
-    try {
-        const saleId = parseInt(id);
-        if (isNaN(saleId)) {
-            const err = new Error('Invalid Sale ID.');
-            err.statusCode = 400;
-            throw err;
-        }
-        
-        const parsedCustomerId = parseInt(customerId, 10);
-        if (isNaN(parsedCustomerId)) {
-            const err = new Error('Customer ID must be a valid number.');
-            err.statusCode = 400;
-            return next(err);
-        }
-        if (!Array.isArray(inventoryItemIds) || inventoryItemIds.some(itemId => typeof itemId !== 'number')) {
-            const err = new Error('inventoryItemIds must be an array of numbers.');
-            err.statusCode = 400;
-            return next(err);
-        }
-
-        const updatedSale = await prisma.$transaction(async (tx) => {
-            const originalSale = await tx.sale.findUnique({
-                where: { id: saleId },
-                include: { itemsSold: true },
-            });
-
-            if (!originalSale) {
-                const err = new Error("Sale not found.");
-                err.statusCode = 404;
-                throw err;
-            }
-            
-            const originalItemIds = originalSale.itemsSold.map(item => item.id);
-            if (originalItemIds.length > 0) {
-                 await tx.inventoryItem.updateMany({
-                    where: { id: { in: originalItemIds } },
-                    data: { status: 'IN_STOCK', saleId: null },
-                });
-            }
-
-             const itemsToSell = await tx.inventoryItem.findMany({
-                where: { id: { in: inventoryItemIds } },
-                include: { productModel: { select: { sellingPrice: true } } },
-            });
-            if (itemsToSell.length !== inventoryItemIds.length) {
-                const err = new Error('One or more new items are not available for sale.');
-                err.statusCode = 400;
-                throw err;
-            }
-            const subtotal = itemsToSell.reduce((sum, item) => sum + (item.productModel?.sellingPrice || 0), 0);
-            const vatAmount = subtotal * 0.07;
-            const total = subtotal + vatAmount;
-
-            if (inventoryItemIds.length > 0) {
-                await tx.inventoryItem.updateMany({
-                    where: { id: { in: inventoryItemIds } },
-                    data: { status: 'SOLD', saleId: saleId },
-                });
-            }
-
-            await createEventLog(
-                tx,
-                -1,
-                actorId,
-                EventType.UPDATE,
-                { details: `Sale ID: ${saleId} was updated.` }
-            );
-
-            return await tx.sale.update({
-                where: { id: saleId },
-                data: {
-                    customerId: parsedCustomerId,
-                    subtotal: subtotal,
-                    vatAmount: vatAmount,
-                    total: total,
-                },
-                include: { customer: true, soldBy: true, itemsSold: true },
-            });
-        });
-
-        res.status(200).json(updatedSale);
 
     } catch (error) {
         next(error);

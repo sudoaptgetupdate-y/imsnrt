@@ -41,7 +41,6 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
 
     const inputRefs = useRef([]);
     const firstInputRef = useRef(null);
-    const scannerTimeoutRefs = useRef([]);
 
     useEffect(() => {
         if (isOpen && selectedModel) {
@@ -55,6 +54,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         setSelectedModel(model);
     };
 
+    // --- START: แก้ไขส่วนนี้ ---
     const handleInputChange = (e, index, field) => {
         const { value } = e.target;
         let processedValue = value;
@@ -68,27 +68,9 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         const newItems = [...manualItems];
         newItems[index][field] = processedValue;
         setManualItems(newItems);
-
-        if (field === 'serialNumber') {
-            if (scannerTimeoutRefs.current[index]) {
-                clearTimeout(scannerTimeoutRefs.current[index]);
-            }
-            scannerTimeoutRefs.current[index] = setTimeout(() => {
-                const isMacRequired = selectedModel?.category?.requiresMacAddress;
-                if (isMacRequired) {
-                    const macInputIndex = index * 3 + 2;
-                    inputRefs.current[macInputIndex]?.focus();
-                } else {
-                    if (index === manualItems.length - 1) {
-                        addManualItemRow();
-                    } else {
-                        const nextAssetCodeIndex = (index + 1) * 3;
-                        inputRefs.current[nextAssetCodeIndex]?.focus();
-                    }
-                }
-            }, 100);
-        }
+        // ** ลบ Logic setTimeout ที่เกี่ยวกับ scanner ออกไปทั้งหมด **
     };
+    // --- END: แก้ไขส่วนนี้ ---
 
     const addManualItemRow = () => {
         if (manualItems.length < MAX_ASSETS_MANUAL) {
