@@ -288,8 +288,8 @@
   "receive_dialog_alert_description": "คุณแน่ใจหรือไม่ว่าต้องการบันทึกการรับคืนสินค้าสำหรับรายการที่เลือกตามผลลัพธ์ที่ระบุ? การกระทำนี้ไม่สามารถย้อนกลับได้",
   "continue": "ดำเนินการต่อ",
   "print_header_title": "ใบส่งซ่อมสินค้า / Repair Order",
-  "print_sender_signature": "ผู้ส่งมอบสินค้า",
-  "print_receiver_signature": "ผู้รับสินค้า",
+  "print_sender_signature": "เจ้าหน้าที่ส่งซ่อม",
+  "print_receiver_signature": "ผู้รับ/ส่งคืนสินค้า",
   "user_combobox_search_placeholder": "ค้นหาพนักงาน...",
   "suppliers": "ผู้จัดจำหน่าย",
   "suppliers_title": "ผู้จัดจำหน่าย",
@@ -594,5 +594,7 @@
   "success_supplier_updated": "อัปเดตข้อมูลผู้จัดจำหน่ายเรียบร้อยแล้ว",
   "success_supplier_created": "สร้างข้อมูลผู้จัดจำหน่ายใหม่เรียบร้อยแล้ว",
   "item_history_description_title": "รายละเอียดและข้อมูลจำเพาะของรายการที่เลือก",
-  "company_profile": "ข้อมูลบริษัท"
+  "company_profile": "ข้อมูลบริษัท",
+  "borrowing_details_card_title": "รายละเอียดการยืม",
+  "sale_details_card_title": "รายละเอียดการขาย"
 }

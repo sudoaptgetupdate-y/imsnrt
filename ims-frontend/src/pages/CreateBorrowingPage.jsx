@@ -27,20 +27,20 @@ import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { BrandCombobox } from "@/components/ui/BrandCombobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const NOTE_MAX_LENGTH = 191;
+
 export default function CreateBorrowingPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const token = useAuthStore((state) => state.token);
 
-    const [selectedCustomerId, setSelectedCustomerId] = useState(""); // <-- แก้ไข
+    const [selectedCustomerId, setSelectedCustomerId] = useState("");
     const [selectedItems, setSelectedItems] = useState([]);
     const [dueDate, setDueDate] = useState("");
     const [notes, setNotes] = useState("");
 
-    // --- START: สร้าง excludeIds จาก selectedItems ---
     const excludeIds = selectedItems.map(item => item.id);
-    // --- END ---
 
     const {
         data: availableItems,
@@ -56,7 +56,7 @@ export default function CreateBorrowingPage() {
         "/inventory", 
         10, 
         { status: "IN_STOCK", categoryId: "All", brandId: "All" },
-        excludeIds // --- START: ส่ง excludeIds ไปให้ Hook ---
+        excludeIds
     );
 
     useEffect(() => {
@@ -77,7 +77,7 @@ export default function CreateBorrowingPage() {
     };
 
     const handleSubmit = async () => {
-        if (!selectedCustomerId) { // <-- แก้ไข
+        if (!selectedCustomerId) {
             toast.error("Please select a borrower.");
             return;
         }
@@ -85,6 +85,12 @@ export default function CreateBorrowingPage() {
             toast.error("Please add at least one item.");
             return;
         }
+        // --- START: เพิ่มการตรวจสอบความยาวของหมายเหตุ ---
+        if (notes && notes.length > NOTE_MAX_LENGTH) {
+            toast.error(`Notes cannot exceed ${NOTE_MAX_LENGTH} characters.`);
+            return;
+        }
+        // --- END ---
 
         const payload = {
             customerId: parseInt(selectedCustomerId),
@@ -104,9 +110,7 @@ export default function CreateBorrowingPage() {
         }
     };
     
-    // --- START: ไม่ต้องกรองข้อมูลซ้ำซ้อนใน Frontend ---
     const displayedAvailableItems = availableItems;
-    // --- END ---
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -191,12 +195,13 @@ export default function CreateBorrowingPage() {
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <Label>{t('createBorrowing_borrower_label')}</Label>
-                        <CustomerCombobox selectedValue={selectedCustomerId} onSelect={setSelectedCustomerId} /> {/* <-- แก้ไข */}
+                        <CustomerCombobox selectedValue={selectedCustomerId} onSelect={setSelectedCustomerId} />
                     </div>
                     <div className="space-y-2">
                         <Label>{t('createBorrowing_dueDate_label')}</Label>
                         <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                     </div>
+                    {/* --- START: เพิ่มตัวนับตัวอักษร --- */}
                     <div className="space-y-2">
                         <Label htmlFor="notes">{t('notes')}</Label>
                         <Textarea 
@@ -204,7 +209,11 @@ export default function CreateBorrowingPage() {
                             value={notes} 
                             onChange={(e) => setNotes(e.target.value)}
                         />
+                        <p className={`text-xs text-right ${notes.length > NOTE_MAX_LENGTH ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {notes.length} / {NOTE_MAX_LENGTH}
+                        </p>
                     </div>
+                    {/* --- END --- */}
                     <Separator />
                     <div className="space-y-2">
                         <h4 className="text-sm font-medium">{t('createSale_selected_items', { count: selectedItems.length })}</h4>
@@ -224,7 +233,7 @@ export default function CreateBorrowingPage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button className="w-full" size="lg" onClick={handleSubmit} disabled={!selectedCustomerId || selectedItems.length === 0}> {/* <-- แก้ไข */}
+                    <Button className="w-full" size="lg" onClick={handleSubmit} disabled={!selectedCustomerId || selectedItems.length === 0}>
                         {t('createBorrowing_confirm_button')}
                     </Button>
                 </CardFooter>

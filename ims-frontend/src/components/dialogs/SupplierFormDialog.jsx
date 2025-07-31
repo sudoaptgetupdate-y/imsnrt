@@ -26,6 +26,10 @@ const initialFormData = {
     address: ''
 };
 
+// --- START: กำหนดความยาวสูงสุดของที่อยู่ ---
+const ADDRESS_MAX_LENGTH = 255;
+// --- END ---
+
 export default function SupplierFormDialog({ isOpen, setIsOpen, supplier, onSave }) {
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
@@ -52,6 +56,14 @@ export default function SupplierFormDialog({ isOpen, setIsOpen, supplier, onSave
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // --- START: เพิ่มการตรวจสอบความยาวของที่อยู่ ---
+        if (formData.address && formData.address.length > ADDRESS_MAX_LENGTH) {
+            toast.error(t('error_address_length', { maxLength: ADDRESS_MAX_LENGTH }));
+            return;
+        }
+        // --- END ---
+
         const url = supplier ? `/suppliers/${supplier.id}` : '/suppliers';
         const method = supplier ? 'put' : 'post';
 
@@ -97,10 +109,15 @@ export default function SupplierFormDialog({ isOpen, setIsOpen, supplier, onSave
                             <Input id="phone" value={formData.phone} onChange={handleInputChange} />
                         </div>
                     </div>
+                    {/* --- START: เพิ่มตัวนับตัวอักษร --- */}
                     <div className="space-y-2">
                         <Label htmlFor="address">{t('supplier_form_address_label')}</Label>
                         <Textarea id="address" value={formData.address} onChange={handleInputChange} rows={3} />
+                        <p className={`text-xs text-right ${formData.address.length > ADDRESS_MAX_LENGTH ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {formData.address.length} / {ADDRESS_MAX_LENGTH}
+                        </p>
                     </div>
+                    {/* --- END --- */}
                     <DialogFooter>
                         <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>{t('cancel')}</Button>
                         <Button type="submit">{t('save')}</Button>

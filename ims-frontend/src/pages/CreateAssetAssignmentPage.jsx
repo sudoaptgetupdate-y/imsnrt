@@ -27,6 +27,7 @@ import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { BrandCombobox } from "@/components/ui/BrandCombobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const NOTE_MAX_LENGTH = 191;
 
 export default function CreateAssetAssignmentPage() {
     const { t } = useTranslation();
@@ -84,6 +85,10 @@ export default function CreateAssetAssignmentPage() {
         }
          if (selectedAssets.length === 0) {
             toast.error("Please add at least one asset.");
+            return;
+        }
+        if (notes && notes.length > NOTE_MAX_LENGTH) {
+            toast.error(`Notes cannot exceed ${NOTE_MAX_LENGTH} characters.`);
             return;
         }
 
@@ -207,6 +212,9 @@ export default function CreateAssetAssignmentPage() {
                             value={notes} 
                             onChange={(e) => setNotes(e.target.value)}
                         />
+                        <p className={`text-xs text-right ${notes.length > NOTE_MAX_LENGTH ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {notes.length} / {NOTE_MAX_LENGTH}
+                        </p>
                     </div>
                     <Separator />
                     <div className="space-y-2">

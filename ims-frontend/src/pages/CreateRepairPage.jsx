@@ -96,6 +96,8 @@ const CustomerItemDialog = ({ onAddItem }) => {
     );
 };
 
+const NOTE_MAX_LENGTH = 191;
+
 export default function CreateRepairPage() {
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -208,6 +210,10 @@ export default function CreateRepairPage() {
         }
         if (repairType === 'CUSTOMER' && !selectedCustomerId) {
             toast.error("Please select a customer.");
+            return;
+        }
+        if (notes && notes.length > NOTE_MAX_LENGTH) {
+            toast.error(`Notes cannot exceed ${NOTE_MAX_LENGTH} characters.`);
             return;
         }
 
@@ -397,7 +403,13 @@ export default function CreateRepairPage() {
                         <div className="space-y-2"><Label>{t('createRepair_sender_label')}</Label><AddressCombobox selectedValue={senderId} onSelect={setSenderId} /></div>
                         <div className="space-y-2"><Label>{t('createRepair_receiver_label')}</Label><AddressCombobox selectedValue={receiverId} onSelect={setReceiverId} /></div>
                     </div>
-                    <div className="space-y-2"><Label>{t('createBorrowing_notes_label')}</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+                    <div className="space-y-2">
+                        <Label>{t('createBorrowing_notes_label')}</Label>
+                        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+                        <p className={`text-xs text-right ${notes.length > NOTE_MAX_LENGTH ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {notes.length} / {NOTE_MAX_LENGTH}
+                        </p>
+                    </div>
                     <Separator />
                     <div className="space-y-2">
                         <h4 className="text-sm font-medium">{t('createSale_selected_items', { count: selectedItems.length })}</h4>

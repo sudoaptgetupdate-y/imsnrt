@@ -594,5 +594,7 @@
   "success_supplier_updated": "Supplier has been updated successfully.",
   "success_supplier_created": "Supplier has been created successfully.",
   "item_history_description_title": "Details and specifications for the selected item.",
-  "company_profile": "Company Profile"
+  "company_profile": "Company Profile",
+  "borrowing_details_card_title": "Borrowing Details",
+  "sale_details_card_title": "Sale Details"
 }

@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-// --- START: แก้ไขตรงนี้ ---
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// --- END: แก้ไขตรงนี้ ---
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, AlertTriangle, Printer } from "lucide-react";
@@ -202,8 +200,8 @@ export default function SaleDetailPage() {
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                  <div>
-                                    <CardTitle>Sale Details</CardTitle>
-                                    <CardDescription>Record ID #{formattedSaleId}</CardDescription>
+                                    <CardTitle>{t('sale_details_card_title')}</CardTitle>
+                                    <CardDescription>{t('record_id')} #{formattedSaleId}</CardDescription>
                                 </div>
                                  <StatusBadge status={sale.status} className="w-28 text-base"/>
                             </div>
