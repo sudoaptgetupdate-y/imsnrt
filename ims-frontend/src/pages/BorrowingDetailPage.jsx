@@ -142,12 +142,12 @@ const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) =
     );
 };
 
-// --- START: แก้ไขส่วนนี้ ---
 const PrintableHeaderCard = ({ borrowing, formattedBorrowingId, t, profile }) => (
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
             <h1 className="text-lg font-bold">{profile.name}</h1>
             <p className="text-xs">{profile.addressLine1}</p>
+            <p className="text-xs">{profile.addressLine2}</p>
             <p className="text-xs">{t('company_phone_label')}: {profile.phone}</p>
         </CardHeader>
         <CardContent className="p-2 border-y border-black">
@@ -219,7 +219,6 @@ const PrintableItemsCard = ({ borrowing, t }) => (
         </CardContent>
     </Card>
 );
-// --- END: แก้ไขส่วนนี้ ---
 
 
 export default function BorrowingDetailPage() {
@@ -227,6 +226,8 @@ export default function BorrowingDetailPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
+    const { user: currentUser } = useAuthStore((state) => state);
+    const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
     const [borrowing, setBorrowing] = useState(null);
     const [companyProfile, setCompanyProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -303,7 +304,7 @@ export default function BorrowingDetailPage() {
                             <Printer className="mr-2 h-4 w-4" />
                             {t('print_pdf')}
                         </Button>
-                        {itemsToReturn.length > 0 && (
+                        {canManage && itemsToReturn.length > 0 && (
                             <Button onClick={() => setIsReturnDialogOpen(true)}>
                                 <CornerDownLeft className="mr-2"/> {t('receive_returned_items_button')}
                             </Button>
@@ -316,7 +317,7 @@ export default function BorrowingDetailPage() {
                         <CardHeader>
                             <div className="flex justify-between items-start">
                                  <div>
-                                    <CardTitle>{t('borrowing_details_card_title', { id: formattedBorrowingId })}</CardTitle>
+                                    <CardTitle>{t('borrowing_details_card_title')}</CardTitle>
                                     <CardDescription>{t('record_id')} #{formattedBorrowingId}</CardDescription>
                                 </div>
                                  <StatusBadge status={borrowing.status} className="w-28 text-base"/>

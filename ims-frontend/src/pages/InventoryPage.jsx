@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
-import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, PlusCircle, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Package } from "lucide-react";
+// --- START: 1. Import ไอคอนและคอมโพเนนต์ที่จำเป็นเพิ่ม ---
+import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, PlusCircle, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Package, Download } from "lucide-react";
+// --- END ---
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +34,8 @@ import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { useTranslation } from "react-i18next";
 import BatchAddInventoryDialog from "@/components/dialogs/BatchAddInventoryDialog";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
+
+// ... (ส่วนคอมโพเนนต์ SkeletonRow, SortableHeader, initialEditFormData ไม่มีการเปลี่ยนแปลง) ...
 
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -61,6 +65,7 @@ const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, c
     </TableHead>
 );
 
+
 export default function InventoryPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
@@ -81,6 +86,53 @@ export default function InventoryPage() {
     const [isSerialRequired, setIsSerialRequired] = useState(true);
     const [itemToDelete, setItemToDelete] = useState(null);
     const [itemToDecommission, setItemToDecommission] = useState(null);
+    
+    // --- START: 2. เพิ่ม State และฟังก์ชันสำหรับจัดการ Export ---
+    const [exportSortBy, setExportSortBy] = useState('serialNumber');
+    const [isExporting, setIsExporting] = useState(false);
+
+    const handleExport = async (exportFiltered) => {
+        setIsExporting(true);
+        toast.info("Generating your export file, please wait...");
+
+        try {
+            // กำหนด Params ที่จะส่งไปให้ Backend
+            const params = {
+                sortBy: exportSortBy,
+                sortOrder: 'asc',
+                // หากเลือก "Export Filtered" ให้ใช้ Filter ปัจจุบัน
+                ...(exportFiltered && {
+                    search: searchTerm,
+                    status: filters.status,
+                    categoryId: filters.categoryId,
+                    brandId: filters.brandId,
+                }),
+            };
+
+            const response = await axiosInstance.get('/export/inventory', {
+                headers: { Authorization: `Bearer ${token}` },
+                params,
+                responseType: 'blob', // สำคัญมาก: บอกให้ axios รับข้อมูลเป็นไฟล์
+            });
+
+            // สร้าง URL ชั่วคราวจากข้อมูลไฟล์ที่ได้รับ
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'inventory-export.csv'); // ตั้งชื่อไฟล์
+            document.body.appendChild(link);
+            link.click(); // สั่งให้ดาวน์โหลด
+            link.parentNode.removeChild(link); // ลบ Link ออกหลังดาวน์โหลดเสร็จ
+            window.URL.revokeObjectURL(url);
+
+            toast.success("File has been downloaded successfully!");
+        } catch (error) {
+            toast.error("Failed to export data. Please try again.");
+        } finally {
+            setIsExporting(false);
+        }
+    };
+    // --- END: จบส่วนจัดการ Export ---
 
     const {
         data: inventoryItems, pagination, isLoading, searchTerm, filters,
@@ -227,13 +279,47 @@ export default function InventoryPage() {
                         <CardDescription className="mt-1">{t('inventory_description')}</CardDescription>
                     </div>
                     {canManage &&
-                        <Button onClick={() => setIsBatchAddOpen(true)}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> {t('inventory_add_new')}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button onClick={() => setIsBatchAddOpen(true)}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> {t('inventory_add_new')}
+                            </Button>
+                        
+                            {/* --- START: 3. เพิ่ม UI สำหรับ Export --- */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" disabled={isExporting}>
+                                        <Download className="mr-2 h-4 w-4" /> Export
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <Select value={exportSortBy} onValueChange={setExportSortBy}>
+                                        <SelectTrigger className="w-48 mx-2 my-1 h-8">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="serialNumber">Serial Number</SelectItem>
+                                            <SelectItem value="customerName">Customer Name</SelectItem>
+                                            <SelectItem value="supplierName">Supplier</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleExport(true)}>
+                                        Export Filtered ({pagination?.totalItems || 0} items)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleExport(false)}>
+                                        Export All
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            {/* --- END: จบส่วน UI Export --- */}
+                        </div>
                     }
                 </div>
             </CardHeader>
 
+            {/* ... (ส่วน CardContent, Table, CardFooter ไม่มีการเปลี่ยนแปลง) ... */}
             <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Input
@@ -429,6 +515,7 @@ export default function InventoryPage() {
                 </div>
             </CardFooter>
 
+            {/* ... (ส่วน Dialogs และ AlertDialogs ไม่มีการเปลี่ยนแปลง) ... */}
             <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
