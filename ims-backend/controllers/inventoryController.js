@@ -20,7 +20,8 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 
 inventoryController.addInventoryItem = async (req, res, next) => {
     try {
-        const { serialNumber, macAddress, productModelId, supplierId } = req.body;
+        // --- 1. รับ `notes` จาก request body ---
+        const { serialNumber, macAddress, productModelId, supplierId, notes } = req.body;
         const userId = req.user.id;
 
         const parsedModelId = parseInt(productModelId, 10);
@@ -73,6 +74,7 @@ inventoryController.addInventoryItem = async (req, res, next) => {
                     ownerType: ItemOwner.COMPANY,
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
+                    notes: notes || null, // --- 2. เพิ่ม `notes` ตอนสร้างข้อมูล ---
                     productModelId: parsedModelId,
                     supplierId: parsedSupplierId,
                     addedById: userId,
@@ -152,6 +154,7 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
                         ownerType: ItemOwner.COMPANY,
                         serialNumber: item.serialNumber || null,
                         macAddress: item.macAddress || null,
+                        notes: item.notes || null, // --- 3. เพิ่ม `notes` ตอนสร้างแบบ Batch ---
                         productModelId: parsedModelId,
                         supplierId: parsedSupplierId,
                         addedById: userId,
@@ -181,6 +184,8 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
         next(error);
     }
 };
+
+// ... (getAllInventoryItems และ getInventoryItemById ไม่ต้องแก้ไข)
 
 inventoryController.getAllInventoryItems = async (req, res, next) => {
     try {
@@ -347,11 +352,13 @@ inventoryController.getInventoryItemById = async (req, res, next) => {
     }
 };
 
+
 inventoryController.updateInventoryItem = async (req, res, next) => {
     const { id } = req.params;
     const actorId = req.user.id;
     try {
-        const { serialNumber, macAddress, status, productModelId, supplierId } = req.body;
+        // --- 4. รับ `notes` จาก request body ---
+        const { serialNumber, macAddress, status, productModelId, supplierId, notes } = req.body;
         
         const itemId = parseInt(id);
         if (isNaN(itemId)) {
@@ -401,6 +408,7 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
                     status,
+                    notes: notes || null, // --- 5. เพิ่ม `notes` ตอนอัปเดตข้อมูล ---
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId, 10) : null,
                 },
@@ -420,6 +428,7 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
     }
 };
 
+// ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข)
 inventoryController.deleteInventoryItem = async (req, res, next) => {
     const { id } = req.params;
     try {

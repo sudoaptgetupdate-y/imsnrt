@@ -1,5 +1,3 @@
-// src/components/dialogs/BatchAddAssetDialog.jsx
-
 import { useState, useRef, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose
@@ -18,6 +16,7 @@ import { PlusCircle, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const MAX_ASSETS_MANUAL = 10;
+const FIELDS_PER_ROW = 4; // assetCode, serialNumber, macAddress, notes
 
 const formatMacAddress = (value) => {
     const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -34,7 +33,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
     const { t } = useTranslation();
     const [selectedModel, setSelectedModel] = useState(null);
     const [selectedSupplierId, setSelectedSupplierId] = useState("");
-    const [manualItems, setManualItems] = useState([{ assetCode: '', serialNumber: '', macAddress: '' }]);
+    const [manualItems, setManualItems] = useState([{ assetCode: '', serialNumber: '', macAddress: '', notes: '' }]);
     const [listText, setListText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const token = useAuthStore((state) => state.token);
@@ -53,30 +52,27 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
     const handleModelSelect = (model) => {
         setSelectedModel(model);
     };
-
-    // --- START: แก้ไขส่วนนี้ ---
+    
     const handleInputChange = (e, index, field) => {
         const { value } = e.target;
         let processedValue = value;
 
         if (field === 'macAddress') {
             processedValue = formatMacAddress(value);
-        } else {
+        } else if (field !== 'notes') {
             processedValue = value.toUpperCase();
         }
 
         const newItems = [...manualItems];
         newItems[index][field] = processedValue;
         setManualItems(newItems);
-        // ** ลบ Logic setTimeout ที่เกี่ยวกับ scanner ออกไปทั้งหมด **
     };
-    // --- END: แก้ไขส่วนนี้ ---
 
     const addManualItemRow = () => {
         if (manualItems.length < MAX_ASSETS_MANUAL) {
-            setManualItems([...manualItems, { assetCode: '', serialNumber: '', macAddress: '' }]);
+            setManualItems([...manualItems, { assetCode: '', serialNumber: '', macAddress: '', notes: '' }]);
             setTimeout(() => {
-                const nextIndex = manualItems.length * 3;
+                const nextIndex = manualItems.length * FIELDS_PER_ROW; 
                 inputRefs.current[nextIndex]?.focus();
             }, 100);
         } else {
@@ -89,43 +85,50 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         setManualItems(newItems);
     };
 
-    const handleKeyDown = (e, index, field) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const isMacRequired = selectedModel?.category?.requiresMacAddress;
-            const snIndex = index * 3 + 1;
-            const macIndex = index * 3 + 2;
+    const handleKeyDown = (e, rowIndex, fieldIndex) => {
+        const currentRefIndex = rowIndex * FIELDS_PER_ROW + fieldIndex;
 
-            if (field === 'assetCode') {
-                inputRefs.current[snIndex]?.focus();
-            } else if (field === 'serialNumber') {
-                if (isMacRequired) {
-                    inputRefs.current[macIndex]?.focus();
-                } else {
-                    if (index === manualItems.length - 1) {
-                        addManualItemRow();
-                    } else {
-                        const nextAssetCodeIndex = (index + 1) * 3;
-                        inputRefs.current[nextAssetCodeIndex]?.focus();
-                    }
-                }
-            } else if (field === 'macAddress') {
-                const currentItem = manualItems[index];
-                
-                if (isMacRequired && currentItem.macAddress.trim() !== '' && !validateMacAddress(currentItem.macAddress)) {
-                    toast.error(t('error_invalid_mac'));
-                    return;
-                }
-
-                if (index === manualItems.length - 1) {
-                    if (!isMacRequired || (isMacRequired && currentItem.macAddress.trim() !== '')) {
-                        addManualItemRow();
-                    }
-                } else {
-                    const nextAssetCodeIndex = (index + 1) * 3;
-                    inputRefs.current[nextAssetCodeIndex]?.focus();
+        const focusNext = () => {
+            const nextRefIndex = currentRefIndex + 1;
+            if (inputRefs.current[nextRefIndex]) {
+                inputRefs.current[nextRefIndex].focus();
+            } else if (rowIndex < manualItems.length - 1) { 
+                const nextRowFirstInput = (rowIndex + 1) * FIELDS_PER_ROW;
+                if (inputRefs.current[nextRowFirstInput]) {
+                     inputRefs.current[nextRowFirstInput].focus();
                 }
             }
+        };
+
+        const focusPrev = () => {
+            const prevRefIndex = currentRefIndex - 1;
+            if (inputRefs.current[prevRefIndex]) {
+                inputRefs.current[prevRefIndex].focus();
+            }
+        };
+        
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextRowIndex = rowIndex + 1;
+            if (nextRowIndex === manualItems.length) {
+                addManualItemRow();
+            } else {
+                const nextFieldIndex = nextRowIndex * FIELDS_PER_ROW + fieldIndex;
+                inputRefs.current[nextFieldIndex]?.focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevRowIndex = rowIndex - 1;
+            if (prevRowIndex >= 0) {
+                 const prevFieldIndex = prevRowIndex * FIELDS_PER_ROW + fieldIndex;
+                 inputRefs.current[prevFieldIndex]?.focus();
+            }
+        } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
+             e.preventDefault();
+             focusNext();
+        } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+            e.preventDefault();
+            focusPrev();
         }
     };
 
@@ -159,33 +162,35 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                         assetCode: item.assetCode.trim(),
                         serialNumber: item.serialNumber.trim() || null,
                         macAddress: item.macAddress.trim() || null,
+                        notes: item.notes.trim() || null,
                     }
                 });
         } else {
             itemsPayload = listText
                 .split('\n')
                 .map(line => line.trim())
-                .filter(line => line)
+                .filter(line => line && !line.startsWith('#')) // Ignore comments
                 .map(line => {
                     const parts = line.split(/[,\t]/).map(part => part.trim());
-                    const assetCode = parts[0];
+                    const [assetCode, serialNumber, macAddress, notes] = parts;
                     if (!assetCode) hasError = true;
-                    if (requiresSerialNumber && !parts[1]) hasError = true;
-                    if (requiresMacAddress && !parts[2]) hasError = true;
-                    if (requiresMacAddress && parts[2] && !validateMacAddress(parts[2])) {
+                    if (requiresSerialNumber && !serialNumber) hasError = true;
+                    if (requiresMacAddress && !macAddress) hasError = true;
+                    if (requiresMacAddress && macAddress && !validateMacAddress(macAddress)) {
                         toast.error(`${t('error_invalid_mac')} (${assetCode})`);
                         hasError = true;
                     }
                     return {
                         assetCode: assetCode,
-                        serialNumber: parts[1] || null,
-                        macAddress: parts[2] || null,
+                        serialNumber: serialNumber || null,
+                        macAddress: macAddress || null,
+                        notes: notes || null,
                     };
                 });
         }
         
-        let errorMessage = "An error occurred.";
         if (hasError) {
+             let errorMessage = "An error occurred.";
             if (itemsPayload.some(item => !item.assetCode)) {
                 errorMessage = t('asset_code_required_error');
             } else if (requiresSerialNumber && requiresMacAddress) {
@@ -230,12 +235,12 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         setIsOpen(false);
         setSelectedModel(null);
         setSelectedSupplierId("");
-        setManualItems([{ assetCode: '', serialNumber: '', macAddress: '' }]);
+        setManualItems([{ assetCode: '', serialNumber: '', macAddress: '', notes: '' }]);
         setListText("");
     };
 
     const manualItemCount = manualItems.filter(i => i.assetCode).length;
-    const listItemCount = listText.split('\n').filter(l => l.trim()).length;
+    const listItemCount = listText.split('\n').filter(l => l.trim() && !l.startsWith('#')).length;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -266,40 +271,48 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                             </TabsList>
                             <TabsContent value="manual" className="mt-4">
                                 <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-                                    <div className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
-                                        <Label className="flex-1">{t('asset_code_label')}*</Label>
-                                        <Label className="flex-1">{t('serial_number_label')}</Label>
-                                        <Label className="flex-1">{t('mac_address_label')}</Label>
+                                    <div className="grid grid-cols-[1fr_1fr_1fr_1.5fr_auto] items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+                                        <Label>{t('asset_code_label')}*</Label>
+                                        <Label>{t('serial_number_label')}</Label>
+                                        <Label>{t('mac_address_label')}</Label>
+                                        <Label>{t('notes')}</Label>
                                         <div className="w-9"></div>
                                     </div>
                                     {manualItems.map((item, index) => (
-                                        <div key={index} className="flex items-center gap-2">
+                                        <div key={index} className="grid grid-cols-[1fr_1fr_1fr_1.5fr_auto] items-center gap-2">
                                             <Input
                                                 ref={el => {
-                                                    inputRefs.current[index * 3] = el;
+                                                    inputRefs.current[index * FIELDS_PER_ROW] = el;
                                                     if (index === 0) firstInputRef.current = el;
                                                 }}
                                                 placeholder={t('asset_code_placeholder')}
                                                 value={item.assetCode}
                                                 onChange={(e) => handleInputChange(e, index, 'assetCode')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 'assetCode')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 0)}
                                                 required
                                             />
                                             <Input
-                                                ref={el => inputRefs.current[index * 3 + 1] = el}
+                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 1] = el}
                                                 placeholder={t('serial_number_label')}
                                                 value={item.serialNumber}
                                                 onChange={(e) => handleInputChange(e, index, 'serialNumber')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 'serialNumber')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 1)}
                                                 disabled={!selectedModel?.category.requiresSerialNumber}
                                             />
                                             <Input
-                                                ref={el => inputRefs.current[index * 3 + 2] = el}
+                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 2] = el}
                                                 placeholder={t('mac_address_label')}
                                                 value={item.macAddress}
                                                 onChange={(e) => handleInputChange(e, index, 'macAddress')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 'macAddress')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 2)}
                                                 disabled={!selectedModel?.category.requiresMacAddress}
+                                            />
+                                            <Input
+                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 3] = el}
+                                                placeholder={t('notes')}
+                                                value={item.notes}
+                                                onChange={(e) => handleInputChange(e, index, 'notes')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 3)}
                                             />
                                             <Button variant="ghost" size="icon" onClick={() => removeManualItemRow(index)} disabled={manualItems.length === 1}>
                                                 <XCircle className="h-5 w-5 text-red-500" />
@@ -319,18 +332,25 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                             </TabsContent>
                             <TabsContent value="list" className="mt-4">
                                <Label htmlFor="list-input">{t('list_add_label')}</Label>
-                                <p className="text-xs text-muted-foreground mb-2" dangerouslySetInnerHTML={{ __html: t('list_add_description') }} />
+                               <p className="text-xs text-muted-foreground mb-2">Each item must be on a new line. Use a <strong>Tab</strong> or a <strong>comma (,)</strong> to separate Asset Code, Serial Number, MAC Address, and Notes.</p>
                                 <Textarea
                                     id="list-input"
                                     className="h-48 font-mono text-sm"
                                     placeholder={
-`[Example from Excel or Tab-separated]
-ASSET-001	SN-001	AA:BB:CC:11:11:11
-ASSET-002	SN-002
+`# Asset Code (required), Serial Number, MAC Address, Notes
+# Use Tab or comma to separate values. Lines starting with # are ignored.
 
-[Example from Text file or Comma-separated]
-ASSET-003,SN-003,DD:EE:FF:33:33:33
-ASSET-004,,EE:FF:AA:44:44:44`
+# Example 1: Full details, separated by Tab
+A-001	SN-1001	AA:BB:CC:11:22:33	Has a small scratch on the side.
+
+# Example 2: Separated by comma, no MAC Address
+A-002,SN-1002,,Waiting for MAC address assignment.
+
+# Example 3: No notes
+A-003	SN-1003	DD:EE:FF:44:55:66
+
+# Example 4: No Serial Number (if category allows)
+A-004,,AA:BB:CC:77:88:99	From new lot.`
                                     }
                                     value={listText}
                                     onChange={(e) => setListText(e.target.value)}

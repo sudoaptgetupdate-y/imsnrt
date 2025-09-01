@@ -19,7 +19,8 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 
 assetController.createAsset = async (req, res, next) => {
     try {
-        const { serialNumber, macAddress, productModelId, assetCode, supplierId } = req.body;
+        // --- 1. รับ `notes` จาก request body ---
+        const { serialNumber, macAddress, productModelId, assetCode, supplierId, notes } = req.body;
         const userId = req.user.id;
 
         if (typeof assetCode !== 'string' || assetCode.trim() === '') {
@@ -71,6 +72,7 @@ assetController.createAsset = async (req, res, next) => {
                     assetCode: assetCode,
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
+                    notes: notes || null, // --- 2. เพิ่ม `notes` ตอนสร้างข้อมูล ---
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId) : null,
                     addedById: userId,
@@ -147,6 +149,7 @@ assetController.addBatchAssets = async (req, res, next) => {
                         assetCode: item.assetCode,
                         serialNumber: item.serialNumber || null,
                         macAddress: item.macAddress || null,
+                        notes: item.notes || null, // --- 3. เพิ่ม `notes` ตอนสร้างแบบ Batch ---
                         productModelId: parsedModelId,
                         supplierId: supplierId ? parseInt(supplierId) : null,
                         addedById: userId,
@@ -180,7 +183,8 @@ assetController.updateAsset = async (req, res, next) => {
     const { id } = req.params;
     const actorId = req.user.id;
     try {
-        const { assetCode, serialNumber, macAddress, status, productModelId, supplierId } = req.body;
+        // --- 4. รับ `notes` จาก request body ---
+        const { assetCode, serialNumber, macAddress, status, productModelId, supplierId, notes } = req.body;
 
         const assetId = parseInt(id);
         if (isNaN(assetId)) {
@@ -243,6 +247,7 @@ assetController.updateAsset = async (req, res, next) => {
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
                     status,
+                    notes: notes || null, // --- 5. เพิ่ม `notes` ตอนอัปเดตข้อมูล ---
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId, 10) : null,
                 },
@@ -264,6 +269,8 @@ assetController.updateAsset = async (req, res, next) => {
         next(error);
     }
 };
+
+// ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข)
 
 assetController.deleteAsset = async (req, res, next) => {
     const { id } = req.params;

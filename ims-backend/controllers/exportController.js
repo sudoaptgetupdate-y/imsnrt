@@ -1,93 +1,85 @@
-// ims-backend/controllers/exportController.js
-
 const prisma = require('../prisma/client');
 const { ItemType } = require('@prisma/client');
 
-/**
- * ฟังก์ชันสำหรับแปลงข้อมูล JSON Array เป็น CSV String
- * @param {Array<Object>} items - ข้อมูลสินค้าที่ดึงมาจากฐานข้อมูล
- * @returns {string} - ข้อมูลในรูปแบบ CSV
- */
-const jsonToCsv = (items) => {
-    const header = [
-        'Serial_Number', 'Product_Model', 'Brand', 'Category', 'Status',
-        'Supplier_Name', 'Customer_Name', 'Purchase_Date'
-    ];
-
+const inventoryToCsv = (items) => {
+    // 1. เพิ่ม BOM ( \uFEFF ) เข้าไปหน้า header
+    const header = "\uFEFFCategory,Brand,Model,SerialNumber,MACAddress,Status,Supplier,Customer,SoldDate,Notes\n";
     const rows = items.map(item => {
-        const sale = item.sale;
-        const customerName = sale ? sale.customer.name : '';
-        const purchaseDate = sale ? new Date(sale.saleDate).toISOString().split('T')[0] : '';
-
-        const row = [
-            item.serialNumber || '',
-            item.productModel.modelNumber,
-            item.productModel.brand.name,
-            item.productModel.category.name,
-            item.status,
-            item.supplier ? item.supplier.name : '',
-            customerName,
-            purchaseDate
-        ];
+        const category = item.productModel.category.name.replace(/,/g, '');
+        const brand = item.productModel.brand.name.replace(/,/g, '');
+        const model = item.productModel.modelNumber.replace(/,/g, '');
+        const serial = item.serialNumber || '';
+        const mac = item.macAddress || '';
+        const status = item.status || '';
+        const supplier = item.supplier?.name.replace(/,/g, '') || '';
         
-        return row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
-    });
+        let customerName = '';
+        let soldDate = '';
+        if (item.sale && item.sale.customer) {
+            customerName = item.sale.customer.name.replace(/,/g, '');
+            soldDate = item.sale.saleDate ? new Date(item.sale.saleDate).toISOString().split('T')[0] : '';
+        }
 
-    // --- FIX: แก้ไขการขึ้นบรรทัดใหม่และ BOM ---
-    // 1. ใช้ \r\n จริงๆ แทน \\r\\n (escaped string)
-    const csvString = [header.join(','), ...rows].join('\r\n');
-    
-    // 2. เพิ่ม BOM สำหรับ UTF-8 (ใช้ \uFEFF จริงๆ แทน \\uFEFF)
-    const bom = '\uFEFF';
+        const notes = (item.notes || '').replace(/"/g, '""');
 
-    return bom + csvString;
-    // --- END: จบส่วนแก้ไข ---
+        return `"${category}","${brand}","${model}","${serial}","${mac}","${status}","${supplier}","${customerName}","${soldDate}","${notes}"`;
+    }).join('\n');
+    return header + rows;
 };
+
+
+const assetToCsv = (items) => {
+    // 2. เพิ่ม BOM ( \uFEFF ) เข้าไปหน้า header
+    const header = "\uFEFFAssetCode,Category,Brand,Model,SerialNumber,MACAddress,Status,Supplier,AssignedTo,AssignmentDate,Notes\n";
+    const rows = items.map(item => {
+        const assetCode = item.assetCode || '';
+        const category = item.productModel.category.name.replace(/,/g, '');
+        const brand = item.productModel.brand.name.replace(/,/g, '');
+        const model = item.productModel.modelNumber.replace(/,/g, '');
+        const serial = item.serialNumber || '';
+        const mac = item.macAddress || '';
+        const status = item.status || '';
+        const supplier = item.supplier?.name.replace(/,/g, '') || '';
+
+        let assignedTo = '';
+        let assignmentDate = '';
+        const currentAssignment = item.assignmentRecords
+            .filter(record => !record.returnedAt)
+            .sort((a, b) => new Date(b.assignedAt) - new Date(a.assignedAt))[0];
+
+        if (currentAssignment && currentAssignment.assignment.assignee) {
+            assignedTo = currentAssignment.assignment.assignee.name.replace(/,/g, '');
+            assignmentDate = new Date(currentAssignment.assignedAt).toISOString().split('T')[0];
+        }
+        
+        const notes = (item.notes || '').replace(/"/g, '""');
+
+        return `"${assetCode}","${category}","${brand}","${model}","${serial}","${mac}","${status}","${supplier}","${assignedTo}","${assignmentDate}","${notes}"`;
+    }).join('\n');
+    return header + rows;
+};
+
 
 const exportController = {};
 
-/**
- * Controller หลักสำหรับ Export ข้อมูล Inventory
- */
 exportController.exportInventory = async (req, res, next) => {
     try {
-        const {
-            search = '',
-            status = 'All',
-            categoryId = 'All',
-            brandId = 'All',
-            sortBy = 'serialNumber',
-            sortOrder = 'asc'
-        } = req.query;
+        const { search, status, categoryId, brandId, sortBy = 'serialNumber', sortOrder = 'asc' } = req.query;
 
         let where = { itemType: ItemType.SALE };
-        const filterConditions = [];
-
-        if (status !== 'All') {
-            filterConditions.push({ status: status });
-        }
+        if (status && status !== 'All') where.status = status;
         if (search) {
-            filterConditions.push({
-                OR: [
-                    { serialNumber: { contains: search } },
-                    { macAddress: { equals: search } },
-                    { productModel: { modelNumber: { contains: search } } },
-                ],
-            });
+            where.OR = [
+                { serialNumber: { contains: search } },
+                { macAddress: { equals: search } },
+                { productModel: { modelNumber: { contains: search } } },
+            ];
         }
-        const productModelFilters = {};
-        if (categoryId !== 'All') {
-            productModelFilters.categoryId = parseInt(categoryId);
-        }
-        if (brandId !== 'All') {
-            productModelFilters.brandId = parseInt(brandId);
-        }
-        if (Object.keys(productModelFilters).length > 0) {
-            filterConditions.push({ productModel: productModelFilters });
-        }
-        if (filterConditions.length > 0) {
-            where.AND = filterConditions;
-        }
+        
+        const productModelConditions = {};
+        if (categoryId && categoryId !== 'All') productModelConditions.categoryId = parseInt(categoryId);
+        if (brandId && brandId !== 'All') productModelConditions.brandId = parseInt(brandId);
+        if (Object.keys(productModelConditions).length > 0) where.productModel = productModelConditions;
 
         let orderBy = {};
         if (sortBy === 'customerName') {
@@ -102,31 +94,70 @@ exportController.exportInventory = async (req, res, next) => {
             where,
             orderBy,
             include: {
-                productModel: {
-                    include: {
-                        brand: true,
-                        category: true,
-                    },
-                },
+                productModel: { include: { category: true, brand: true } },
                 supplier: true,
-                sale: {
-                    include: {
-                        customer: true,
-                    },
-                },
-            },
+                sale: { include: { customer: true } }
+            }
         });
 
-        const csvData = jsonToCsv(items);
-
-        // --- FIX: แก้ไข HTTP Headers ---
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', 'attachment; filename="inventory-export.csv"');
-        res.setHeader('Cache-Control', 'no-cache');
-        // --- END: จบส่วนแก้ไข ---
-        
+        const csvData = inventoryToCsv(items);
+        res.header('Content-Type', 'text/csv; charset=utf-8');
+        res.attachment('inventory-export.csv');
         res.send(csvData);
+    } catch (error) {
+        next(error);
+    }
+};
 
+exportController.exportAssets = async (req, res, next) => {
+    try {
+        const { search, status, categoryId, brandId, sortBy = 'assetCode', sortOrder = 'asc' } = req.query;
+        
+        let where = { itemType: ItemType.ASSET };
+        if (status && status !== 'All') where.status = status;
+        if (search) {
+            where.OR = [
+                { assetCode: { contains: search } },
+                { serialNumber: { contains: search } },
+                { macAddress: { equals: search } },
+                { productModel: { modelNumber: { contains: search } } },
+            ];
+        }
+
+        const productModelConditions = {};
+        if (categoryId && categoryId !== 'All') productModelConditions.categoryId = parseInt(categoryId);
+        if (brandId && brandId !== 'All') productModelConditions.brandId = parseInt(brandId);
+        if (Object.keys(productModelConditions).length > 0) where.productModel = productModelConditions;
+        
+        let orderBy = {};
+        if (sortBy === 'assignedTo') {
+             orderBy = { assignmentRecords: { _count: sortOrder } };
+        } else {
+            orderBy = { [sortBy]: sortOrder };
+        }
+
+        const items = await prisma.inventoryItem.findMany({
+            where,
+            orderBy,
+            include: {
+                productModel: { include: { category: true, brand: true } },
+                supplier: true,
+                assignmentRecords: {
+                    include: {
+                        assignment: {
+                            include: {
+                                assignee: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        const csvData = assetToCsv(items);
+        res.header('Content-Type', 'text/csv; charset=utf-8');
+        res.attachment('asset-export.csv');
+        res.send(csvData);
     } catch (error) {
         next(error);
     }

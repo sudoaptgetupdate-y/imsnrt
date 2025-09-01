@@ -1,5 +1,3 @@
-// src/components/dialogs/BatchAddInventoryDialog.jsx
-
 import { useState, useRef, useEffect } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose
@@ -18,6 +16,7 @@ import { PlusCircle, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const MAX_ITEMS_MANUAL = 10;
+const FIELDS_PER_ROW = 3; // serialNumber, macAddress, notes
 
 const formatMacAddress = (value) => {
     const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -34,7 +33,7 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
     const { t } = useTranslation();
     const [selectedModel, setSelectedModel] = useState(null);
     const [selectedSupplierId, setSelectedSupplierId] = useState("");
-    const [manualItems, setManualItems] = useState([{ serialNumber: '', macAddress: '' }]);
+    const [manualItems, setManualItems] = useState([{ serialNumber: '', macAddress: '', notes: '' }]);
     const [listText, setListText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const token = useAuthStore((state) => state.token);
@@ -60,7 +59,7 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
 
         if (field === 'macAddress') {
             processedValue = formatMacAddress(value);
-        } else {
+        } else if (field !== 'notes') {
             processedValue = value.toUpperCase();
         }
 
@@ -71,9 +70,9 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
 
     const addManualItemRow = () => {
         if (manualItems.length < MAX_ITEMS_MANUAL) {
-            setManualItems([...manualItems, { serialNumber: '', macAddress: '' }]);
+            setManualItems([...manualItems, { serialNumber: '', macAddress: '', notes: '' }]);
             setTimeout(() => {
-                const nextIndex = manualItems.length * 2;
+                const nextIndex = manualItems.length * FIELDS_PER_ROW;
                 inputRefs.current[nextIndex]?.focus();
             }, 100);
         } else {
@@ -85,41 +84,51 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         const newItems = manualItems.filter((_, i) => i !== index);
         setManualItems(newItems);
     };
-    
-    const handleKeyDown = (e, index, field) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const isMacRequired = selectedModel?.category?.requiresMacAddress;
 
-            if (field === 'serialNumber') {
-                if (isMacRequired) {
-                    const macInputIndex = index * 2 + 1;
-                    inputRefs.current[macInputIndex]?.focus();
-                } else {
-                     if (index === manualItems.length - 1) {
-                        addManualItemRow();
-                    } else {
-                        const nextSnInputIndex = (index + 1) * 2;
-                        inputRefs.current[nextSnInputIndex]?.focus();
-                    }
-                }
-            } else if (field === 'macAddress') {
-                const currentItem = manualItems[index];
-                
-                if (isMacRequired && currentItem.macAddress.trim() !== '' && !validateMacAddress(currentItem.macAddress)) {
-                    toast.error("Invalid MAC Address format. Please use XX:XX:XX:XX:XX:XX format.");
-                    return; 
-                }
+    const handleKeyDown = (e, rowIndex, fieldIndex) => {
+        const currentRefIndex = rowIndex * FIELDS_PER_ROW + fieldIndex;
 
-                if (index === manualItems.length - 1) {
-                    if (!isMacRequired || (isMacRequired && currentItem.macAddress.trim() !== '')) {
-                        addManualItemRow();
-                    }
-                } else {
-                    const nextSnInputIndex = (index + 1) * 2;
-                    inputRefs.current[nextSnInputIndex]?.focus();
+        const focusNext = () => {
+            const nextRefIndex = currentRefIndex + 1;
+            if (inputRefs.current[nextRefIndex]) {
+                inputRefs.current[nextRefIndex].focus();
+            } else if (rowIndex < manualItems.length - 1) { 
+                const nextRowFirstInput = (rowIndex + 1) * FIELDS_PER_ROW;
+                if (inputRefs.current[nextRowFirstInput]) {
+                     inputRefs.current[nextRowFirstInput].focus();
                 }
             }
+        };
+
+        const focusPrev = () => {
+            const prevRefIndex = currentRefIndex - 1;
+            if (inputRefs.current[prevRefIndex]) {
+                inputRefs.current[prevRefIndex].focus();
+            }
+        };
+        
+        if (e.key === 'Enter' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const nextRowIndex = rowIndex + 1;
+            if (nextRowIndex === manualItems.length) {
+                addManualItemRow();
+            } else {
+                const nextFieldIndex = nextRowIndex * FIELDS_PER_ROW + fieldIndex;
+                inputRefs.current[nextFieldIndex]?.focus();
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            const prevRowIndex = rowIndex - 1;
+            if (prevRowIndex >= 0) {
+                 const prevFieldIndex = prevRowIndex * FIELDS_PER_ROW + fieldIndex;
+                 inputRefs.current[prevFieldIndex]?.focus();
+            }
+        } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
+             e.preventDefault();
+             focusNext();
+        } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
+            e.preventDefault();
+            focusPrev();
         }
     };
 
@@ -153,28 +162,31 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                     return {
                         serialNumber: item.serialNumber || null,
                         macAddress: item.macAddress || null,
+                        notes: item.notes.trim() || null,
                     }
                 });
         } else {
             itemsPayload = listText
                 .split('\n')
                 .map(line => line.trim())
-                .filter(line => line)
+                .filter(line => line && !line.startsWith('#')) // Ignore comments
                 .map(line => {
                     const parts = line.split(/[,\t]/).map(part => part.trim());
-                    if (requiresSerialNumber && !parts[0]) hasError = true;
-                    if (requiresMacAddress && !parts[1]) hasError = true;
-                    if (requiresMacAddress && parts[1] && !validateMacAddress(parts[1])) {
-                        toast.error(`Invalid MAC address format for S/N: ${parts[0]}. Please fix it before saving.`);
+                    const [serialNumber, macAddress, notes] = parts;
+                    if (requiresSerialNumber && !serialNumber) hasError = true;
+                    if (requiresMacAddress && !macAddress) hasError = true;
+                    if (requiresMacAddress && macAddress && !validateMacAddress(macAddress)) {
+                        toast.error(`Invalid MAC address format for S/N: ${serialNumber}. Please fix it before saving.`);
                         hasError = true;
                     }
                     return {
-                        serialNumber: parts[0] || null,
-                        macAddress: parts[1] || null,
+                        serialNumber: serialNumber || null,
+                        macAddress: macAddress || null,
+                        notes: notes || null,
                     };
                 });
         }
-
+        
         if (hasError) {
             let errorMessage = "An error occurred.";
             if (requiresSerialNumber && requiresMacAddress) {
@@ -188,7 +200,7 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
             setIsLoading(false);
             return;
         }
-        
+
         if (itemsPayload.length === 0) {
             toast.error("Please add at least one item to save.");
             setIsLoading(false);
@@ -219,12 +231,12 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         setIsOpen(false);
         setSelectedModel(null);
         setSelectedSupplierId("");
-        setManualItems([{ serialNumber: '', macAddress: '' }]);
+        setManualItems([{ serialNumber: '', macAddress: '', notes: '' }]);
         setListText("");
     };
 
     const manualItemCount = manualItems.filter(i => i.serialNumber || i.macAddress).length;
-    const listItemCount = listText.split('\n').filter(l => l.trim()).length;
+    const listItemCount = listText.split('\n').filter(l => l.trim() && !l.startsWith('#')).length;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -255,26 +267,39 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                             </TabsList>
                             <TabsContent value="manual" className="mt-4">
                                 <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                                    <div className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+                                        <Label>{t('tableHeader_serialNumber')}</Label>
+                                        <Label>{t('tableHeader_macAddress')}</Label>
+                                        <Label>{t('notes')}</Label>
+                                        <div className="w-9"></div>
+                                    </div>
                                     {manualItems.map((item, index) => (
-                                        <div key={index} className="flex items-center gap-2">
+                                        <div key={index} className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2">
                                             <Input
                                                 ref={el => {
-                                                    inputRefs.current[index * 2] = el;
+                                                    inputRefs.current[index * FIELDS_PER_ROW] = el;
                                                     if (index === 0) firstInputRef.current = el;
                                                 }}
                                                 placeholder={t('tableHeader_serialNumber')}
                                                 value={item.serialNumber}
                                                 onChange={(e) => handleInputChange(e, index, 'serialNumber')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 'serialNumber')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 0)}
                                                 disabled={!selectedModel?.category.requiresSerialNumber}
                                             />
                                             <Input
-                                                ref={el => inputRefs.current[index * 2 + 1] = el}
+                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 1] = el}
                                                 placeholder={t('tableHeader_macAddress')}
                                                 value={item.macAddress}
                                                 onChange={(e) => handleInputChange(e, index, 'macAddress')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 'macAddress')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 1)}
                                                 disabled={!selectedModel?.category.requiresMacAddress}
+                                            />
+                                            <Input
+                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 2] = el}
+                                                placeholder={t('notes')}
+                                                value={item.notes}
+                                                onChange={(e) => handleInputChange(e, index, 'notes')}
+                                                onKeyDown={(e) => handleKeyDown(e, index, 2)}
                                             />
                                             <Button variant="ghost" size="icon" onClick={() => removeManualItemRow(index)} disabled={manualItems.length === 1}>
                                                 <XCircle className="h-5 w-5 text-red-500" />
@@ -294,18 +319,25 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                             </TabsContent>
                             <TabsContent value="list" className="mt-4">
                                <Label htmlFor="list-input">{t('batch_add_list_label')}</Label>
-                                <p className="text-xs text-muted-foreground mb-2" dangerouslySetInnerHTML={{ __html: t('batch_add_list_description') }} />
+                               <p className="text-xs text-muted-foreground mb-2">Each item must be on a new line. Use a <strong>Tab</strong> or a <strong>comma (,)</strong> to separate Serial Number, MAC Address, and Notes.</p>
                                 <Textarea
                                     id="list-input"
                                     className="h-48 font-mono text-sm"
                                     placeholder={
-`[Example from Excel or Tab-separated]
-SN-FROM-EXCEL	AA:BB:CC:11:22:33
-SN-WITH-NO-MAC
+`# Serial Number, MAC Address, Notes
+# Use Tab or comma to separate values. Lines starting with # are ignored.
 
-[Example from Text file or Comma-separated]
-SN-FROM-TEXT,DD:EE:FF:44:55:66
-,EE:FF:AA:77:88:99`
+# Example 1: Full details, separated by Tab
+SN-12345	AA:BB:CC:11:22:33	New stock received today.
+
+# Example 2: Separated by comma, no MAC Address
+SN-12346,,For internal testing only.
+
+# Example 3: No notes
+SN-12347	DD:EE:FF:44:55:66
+
+# Example 4: Only Serial Number (if category allows)
+SN-12348`
                                     }
                                     value={listText}
                                     onChange={(e) => setListText(e.target.value)}

@@ -145,6 +145,14 @@ export default function AssetHistoryPage() {
                                 </div>
                             )}
                         </div>
+                        {/* --- START: เพิ่มส่วนแสดง Notes --- */}
+                        {asset.notes && (
+                            <div className="mt-6">
+                                <h4 className="font-semibold">{t('notes')}</h4>
+                                <p className="whitespace-pre-wrap text-sm text-muted-foreground border p-3 rounded-md bg-muted/30">{asset.notes}</p>
+                            </div>
+                        )}
+                        {/* --- END --- */}
                     </CardContent>
                 </Card>
 

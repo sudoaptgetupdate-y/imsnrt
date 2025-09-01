@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { ArrowLeft, PackagePlus } from "lucide-react";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { useTranslation } from "react-i18next";
+import { Textarea } from "@/components/ui/textarea"; // --- 1. Import Textarea ---
 
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -29,11 +30,12 @@ const initialFormData = {
     serialNumber: "",
     macAddress: "",
     productModelId: "",
+    notes: "", // --- 2. เพิ่ม state สำหรับ notes ---
 };
 
 export default function CreateAssetPage() {
     const navigate = useNavigate();
-    const { t } = useTranslation(); // --- 2. เรียกใช้ useTranslation ---
+    const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
     const [formData, setFormData] = useState(initialFormData);
     
@@ -69,16 +71,16 @@ export default function CreateAssetPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (isMacRequired && formData.macAddress && !validateMacAddress(formData.macAddress)) {
-            toast.error(t('error_invalid_mac')); // --- 3. แปลข้อความ ---
+            toast.error(t('error_invalid_mac'));
             return;
         }
 
         if (!formData.productModelId) {
-            toast.error(t('error_select_model')); // --- 3. แปลข้อความ ---
+            toast.error(t('error_select_model'));
             return;
         }
         if (!formData.assetCode) {
-            toast.error(t('error_asset_code_required')); // --- 3. แปลข้อความ ---
+            toast.error(t('error_asset_code_required'));
             return;
         }
         
@@ -95,7 +97,6 @@ export default function CreateAssetPage() {
 
     return (
         <div className="max-w-2xl mx-auto">
-             {/* --- 3. แปลข้อความ --- */}
              <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {t('create_asset_back_button')}
@@ -139,6 +140,17 @@ export default function CreateAssetPage() {
                                 maxLength={17}
                                 placeholder={t('mac_address_placeholder')}
                              />
+                        </div>
+                        {/* --- 3. เพิ่ม Textarea สำหรับ Notes --- */}
+                        <div className="space-y-2">
+                            <Label htmlFor="notes">{t('notes')}</Label>
+                            <Textarea
+                                id="notes"
+                                value={formData.notes}
+                                onChange={handleInputChange}
+                                placeholder="Add any notes for this asset..."
+                                rows={3}
+                            />
                         </div>
                     </CardContent>
                     <CardFooter>

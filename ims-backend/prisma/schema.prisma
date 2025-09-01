@@ -156,6 +156,7 @@ model InventoryItem {
   assetCode           String?                  @unique
   serialNumber        String?                  @unique
   macAddress          String?                  @unique
+  notes               String?
   status              ItemStatus               @default(IN_STOCK)
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt

@@ -14,9 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
-// --- START: 1. Import ไอคอนและคอมโพเนนต์ที่จำเป็นเพิ่ม ---
 import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, PlusCircle, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Package, Download } from "lucide-react";
-// --- END ---
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,8 +32,9 @@ import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { useTranslation } from "react-i18next";
 import BatchAddInventoryDialog from "@/components/dialogs/BatchAddInventoryDialog";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
+import { Textarea } from "@/components/ui/textarea"; // --- 1. Import Textarea ---
 
-// ... (ส่วนคอมโพเนนต์ SkeletonRow, SortableHeader, initialEditFormData ไม่มีการเปลี่ยนแปลง) ...
+// ... (ส่วนคอมโพเนนต์ SkeletonRow, SortableHeader ไม่มีการเปลี่ยนแปลง) ...
 
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -54,6 +53,7 @@ const initialEditFormData = {
     productModelId: "",
     status: "IN_STOCK",
     supplierId: "",
+    notes: "", // --- 2. เพิ่ม `notes` เข้ามาใน state ---
 };
 
 const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, className }) => (
@@ -87,7 +87,6 @@ export default function InventoryPage() {
     const [itemToDelete, setItemToDelete] = useState(null);
     const [itemToDecommission, setItemToDecommission] = useState(null);
     
-    // --- START: 2. เพิ่ม State และฟังก์ชันสำหรับจัดการ Export ---
     const [exportSortBy, setExportSortBy] = useState('serialNumber');
     const [isExporting, setIsExporting] = useState(false);
 
@@ -96,11 +95,9 @@ export default function InventoryPage() {
         toast.info("Generating your export file, please wait...");
 
         try {
-            // กำหนด Params ที่จะส่งไปให้ Backend
             const params = {
                 sortBy: exportSortBy,
                 sortOrder: 'asc',
-                // หากเลือก "Export Filtered" ให้ใช้ Filter ปัจจุบัน
                 ...(exportFiltered && {
                     search: searchTerm,
                     status: filters.status,
@@ -112,17 +109,16 @@ export default function InventoryPage() {
             const response = await axiosInstance.get('/export/inventory', {
                 headers: { Authorization: `Bearer ${token}` },
                 params,
-                responseType: 'blob', // สำคัญมาก: บอกให้ axios รับข้อมูลเป็นไฟล์
+                responseType: 'blob',
             });
 
-            // สร้าง URL ชั่วคราวจากข้อมูลไฟล์ที่ได้รับ
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', 'inventory-export.csv'); // ตั้งชื่อไฟล์
+            link.setAttribute('download', 'inventory-export.csv');
             document.body.appendChild(link);
-            link.click(); // สั่งให้ดาวน์โหลด
-            link.parentNode.removeChild(link); // ลบ Link ออกหลังดาวน์โหลดเสร็จ
+            link.click();
+            link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
 
             toast.success("File has been downloaded successfully!");
@@ -132,7 +128,6 @@ export default function InventoryPage() {
             setIsExporting(false);
         }
     };
-    // --- END: จบส่วนจัดการ Export ---
 
     const {
         data: inventoryItems, pagination, isLoading, searchTerm, filters,
@@ -151,6 +146,7 @@ export default function InventoryPage() {
             serialNumber: item.serialNumber, macAddress: item.macAddress || '',
             productModelId: item.productModelId, status: item.status,
             supplierId: item.supplierId || "",
+            notes: item.notes || "", // --- 3. ดึงข้อมูล `notes` มาใส่ในฟอร์ม ---
         });
         setSelectedModelInfo(item.productModel);
         setInitialSupplier(item.supplier);
@@ -209,6 +205,7 @@ export default function InventoryPage() {
             productModelId: parseInt(editFormData.productModelId, 10),
             status: editFormData.status,
             supplierId: editFormData.supplierId ? parseInt(editFormData.supplierId, 10) : null,
+            notes: editFormData.notes || null, // --- 4. ส่ง `notes` ไปกับ request ---
         };
         try {
             await axiosInstance.put(`/inventory/${editingItemId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
@@ -220,6 +217,7 @@ export default function InventoryPage() {
         }
     };
 
+    // ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข) ...
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         try {
@@ -284,7 +282,6 @@ export default function InventoryPage() {
                                 <PlusCircle className="mr-2 h-4 w-4" /> {t('inventory_add_new')}
                             </Button>
                         
-                            {/* --- START: 3. เพิ่ม UI สำหรับ Export --- */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" disabled={isExporting}>
@@ -313,13 +310,11 @@ export default function InventoryPage() {
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            {/* --- END: จบส่วน UI Export --- */}
                         </div>
                     }
                 </div>
             </CardHeader>
 
-            {/* ... (ส่วน CardContent, Table, CardFooter ไม่มีการเปลี่ยนแปลง) ... */}
             <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Input
@@ -515,7 +510,6 @@ export default function InventoryPage() {
                 </div>
             </CardFooter>
 
-            {/* ... (ส่วน Dialogs และ AlertDialogs ไม่มีการเปลี่ยนแปลง) ... */}
             <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -580,6 +574,17 @@ export default function InventoryPage() {
                                 maxLength={17}
                                 placeholder="AA:BB:CC:DD:EE:FF"
                              />
+                        </div>
+                        {/* --- 5. เพิ่ม Textarea สำหรับ Notes --- */}
+                        <div className="space-y-2">
+                            <Label htmlFor="notes">{t('notes')}</Label>
+                            <Textarea
+                                id="notes"
+                                value={editFormData.notes}
+                                onChange={handleEditInputChange}
+                                placeholder="Add or edit notes for this item..."
+                                rows={3}
+                            />
                         </div>
                         <DialogFooter><Button type="submit">{t('save')}</Button></DialogFooter>
                     </form>

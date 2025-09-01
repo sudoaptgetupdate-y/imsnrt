@@ -13,7 +13,8 @@ import { toast } from 'sonner';
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
 import { useTranslation } from "react-i18next";
-import { SupplierCombobox } from "../ui/SupplierCombobox"; // Assuming you have this component
+import { SupplierCombobox } from "../ui/SupplierCombobox";
+import { Textarea } from "../ui/textarea"; // --- 1. Import Textarea ---
 
 export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
     const { t } = useTranslation();
@@ -32,7 +33,7 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
                 serialNumber: asset.serialNumber || '',
                 macAddress: asset.macAddress || '',
                 status: asset.status,
-                notes: asset.notes || '',
+                notes: asset.notes || '', // --- 2. เพิ่ม `notes` เข้ามาใน state ---
                 supplierId: asset.supplierId || "",
             });
             setSelectedModelInfo(asset.productModel);
@@ -138,6 +139,18 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
                             <Input id="macAddress" value={formData.macAddress} onChange={handleInputChange} disabled={!isMacRequired} />
                         </div>
                         
+                        {/* --- 3. เพิ่ม Textarea สำหรับ Notes --- */}
+                        <div className="space-y-2">
+                            <Label htmlFor="notes">{t('notes_label')}</Label>
+                            <Textarea 
+                                id="notes" 
+                                value={formData.notes} 
+                                onChange={handleInputChange}
+                                placeholder="Add or edit notes for this asset..."
+                                rows={3}
+                            />
+                        </div>
+
                         <DialogFooter>
                             <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>{t('cancel')}</Button>
                             <Button type="submit">{t('save_asset_button')}</Button>
