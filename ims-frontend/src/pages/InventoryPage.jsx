@@ -183,10 +183,18 @@ export default function InventoryPage() {
 
     const handleEditSubmit = async (e) => {
         e.preventDefault();
-        if (isMacRequired && editFormData.macAddress && !validateMacAddress(editFormData.macAddress)) {
+        if (editFormData.macAddress && !validateMacAddress(editFormData.macAddress)) {
             toast.error("Invalid MAC Address format. Please use XX:XX:XX:XX:XX:XX format.");
             return;
         }
+
+        // 2. ตรวจสอบว่าบังคับกรอกหรือไม่
+        if (isMacRequired && !editFormData.macAddress?.trim()) {
+            toast.error("MAC Address is required for this product category.");
+            return;
+        }
+        // --- END ---
+
         if (!editFormData.productModelId) {
             toast.error("Please select a Product Model.");
             return;
@@ -195,17 +203,14 @@ export default function InventoryPage() {
             toast.error("Serial Number is required for this product category.");
             return;
         }
-        if (isMacRequired && !editFormData.macAddress?.trim()) {
-            toast.error("MAC Address is required for this product category.");
-            return;
-        }
+
         const payload = {
             serialNumber: editFormData.serialNumber || null,
             macAddress: editFormData.macAddress || null,
             productModelId: parseInt(editFormData.productModelId, 10),
             status: editFormData.status,
             supplierId: editFormData.supplierId ? parseInt(editFormData.supplierId, 10) : null,
-            notes: editFormData.notes || null, // --- 4. ส่ง `notes` ไปกับ request ---
+            notes: editFormData.notes || null,
         };
         try {
             await axiosInstance.put(`/inventory/${editingItemId}`, payload, { headers: { Authorization: `Bearer ${token}` } });

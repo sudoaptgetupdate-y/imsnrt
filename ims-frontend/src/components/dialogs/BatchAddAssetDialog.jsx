@@ -144,69 +144,65 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         setIsLoading(true);
 
         let itemsPayload = [];
-        let hasError = false;
+        let errorMessages = [];
         const { requiresSerialNumber, requiresMacAddress } = selectedModel.category;
+
+        const processItem = (item, identifier) => {
+            let hasValidationError = false;
+            
+            if (!item.assetCode || !item.assetCode.trim()) {
+                errorMessages.push(`Asset Code is required for all items.`);
+                hasValidationError = true;
+            }
+            if (requiresSerialNumber && (!item.serialNumber || !item.serialNumber.trim())) {
+                errorMessages.push(`Serial Number is required for: ${identifier}`);
+                hasValidationError = true;
+            }
+            if (requiresMacAddress && (!item.macAddress || !item.macAddress.trim())) {
+                errorMessages.push(`MAC Address is required for: ${identifier}`);
+                hasValidationError = true;
+            }
+            if (item.macAddress && !validateMacAddress(item.macAddress.trim())) {
+                errorMessages.push(`Invalid MAC Address format for: ${identifier}`);
+                hasValidationError = true;
+            }
+            
+            return hasValidationError ? null : {
+                assetCode: item.assetCode.trim(),
+                serialNumber: item.serialNumber?.trim() || null,
+                macAddress: item.macAddress?.trim() || null,
+                notes: item.notes?.trim() || null,
+            };
+        };
 
         if (activeTab === 'manual') {
             itemsPayload = manualItems
-                .filter(item => item.assetCode || item.serialNumber || item.macAddress)
-                .map(item => {
-                    if (!item.assetCode.trim()) hasError = true;
-                    if (requiresSerialNumber && !item.serialNumber?.trim()) hasError = true;
-                    if (requiresMacAddress && !item.macAddress?.trim()) hasError = true;
-                    if (requiresMacAddress && item.macAddress && !validateMacAddress(item.macAddress)) {
-                        toast.error(`${t('error_invalid_mac')} (${item.assetCode})`);
-                        hasError = true;
-                    }
-                    return {
-                        assetCode: item.assetCode.trim(),
-                        serialNumber: item.serialNumber.trim() || null,
-                        macAddress: item.macAddress.trim() || null,
-                        notes: item.notes.trim() || null,
-                    }
-                });
+                .filter(item => item.assetCode?.trim() || item.serialNumber?.trim() || item.macAddress?.trim())
+                .map(item => processItem(item, item.assetCode || `Row ${manualItems.indexOf(item) + 1}`))
+                .filter(Boolean);
         } else {
             itemsPayload = listText
                 .split('\n')
                 .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#')) // Ignore comments
+                .filter(line => line && !line.startsWith('#'))
                 .map(line => {
                     const parts = line.split(/[,\t]/).map(part => part.trim());
                     const [assetCode, serialNumber, macAddress, notes] = parts;
-                    if (!assetCode) hasError = true;
-                    if (requiresSerialNumber && !serialNumber) hasError = true;
-                    if (requiresMacAddress && !macAddress) hasError = true;
-                    if (requiresMacAddress && macAddress && !validateMacAddress(macAddress)) {
-                        toast.error(`${t('error_invalid_mac')} (${assetCode})`);
-                        hasError = true;
-                    }
-                    return {
-                        assetCode: assetCode,
-                        serialNumber: serialNumber || null,
-                        macAddress: macAddress || null,
-                        notes: notes || null,
-                    };
-                });
+                    const item = { assetCode, serialNumber, macAddress, notes };
+                    return processItem(item, assetCode || `Line ${listText.split('\n').indexOf(line) + 1}`);
+                })
+                .filter(Boolean);
         }
         
-        if (hasError) {
-             let errorMessage = "An error occurred.";
-            if (itemsPayload.some(item => !item.assetCode)) {
-                errorMessage = t('asset_code_required_error');
-            } else if (requiresSerialNumber && requiresMacAddress) {
-                errorMessage = "Serial Number and MAC Address are required for all items.";
-            } else if (requiresSerialNumber) {
-                errorMessage = "Serial Number is required for all items.";
-            } else if (requiresMacAddress) {
-                errorMessage = "MAC Address is required for all items.";
-            }
-            if (!toast.length) toast.error(errorMessage);
+        if (errorMessages.length > 0) {
+            const uniqueErrors = [...new Set(errorMessages)];
+            toast.error(uniqueErrors.join('\n'));
             setIsLoading(false);
             return;
         }
         
         if (itemsPayload.length === 0) {
-            toast.error("Please add at least one asset to save.");
+            toast.error("Please add at least one valid asset to save.");
             setIsLoading(false);
             return;
         }
@@ -239,7 +235,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         setListText("");
     };
 
-    const manualItemCount = manualItems.filter(i => i.assetCode).length;
+    const manualItemCount = manualItems.filter(i => i.assetCode?.trim()).length;
     const listItemCount = listText.split('\n').filter(l => l.trim() && !l.startsWith('#')).length;
 
     return (
@@ -273,8 +269,14 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                                 <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
                                     <div className="grid grid-cols-[1fr_1fr_1fr_1.5fr_auto] items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
                                         <Label>{t('asset_code_label')}*</Label>
-                                        <Label>{t('serial_number_label')}</Label>
-                                        <Label>{t('mac_address_label')}</Label>
+                                        <Label>
+                                            {t('serial_number_label')}
+                                            {selectedModel.category.requiresSerialNumber && <span className="text-red-500 ml-1">*</span>}
+                                        </Label>
+                                        <Label>
+                                            {t('mac_address_label')}
+                                            {selectedModel.category.requiresMacAddress && <span className="text-red-500 ml-1">*</span>}
+                                        </Label>
                                         <Label>{t('notes')}</Label>
                                         <div className="w-9"></div>
                                     </div>
@@ -289,7 +291,6 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                                                 value={item.assetCode}
                                                 onChange={(e) => handleInputChange(e, index, 'assetCode')}
                                                 onKeyDown={(e) => handleKeyDown(e, index, 0)}
-                                                required
                                             />
                                             <Input
                                                 ref={el => inputRefs.current[index * FIELDS_PER_ROW + 1] = el}
@@ -297,7 +298,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                                                 value={item.serialNumber}
                                                 onChange={(e) => handleInputChange(e, index, 'serialNumber')}
                                                 onKeyDown={(e) => handleKeyDown(e, index, 1)}
-                                                disabled={!selectedModel?.category.requiresSerialNumber}
+                                                disabled={!selectedModel}
                                             />
                                             <Input
                                                 ref={el => inputRefs.current[index * FIELDS_PER_ROW + 2] = el}
@@ -305,7 +306,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                                                 value={item.macAddress}
                                                 onChange={(e) => handleInputChange(e, index, 'macAddress')}
                                                 onKeyDown={(e) => handleKeyDown(e, index, 2)}
-                                                disabled={!selectedModel?.category.requiresMacAddress}
+                                                disabled={!selectedModel}
                                             />
                                             <Input
                                                 ref={el => inputRefs.current[index * FIELDS_PER_ROW + 3] = el}

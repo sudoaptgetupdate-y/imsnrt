@@ -70,10 +70,17 @@ export default function CreateAssetPage() {
     
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (isMacRequired && formData.macAddress && !validateMacAddress(formData.macAddress)) {
+        if (formData.macAddress && !validateMacAddress(formData.macAddress)) {
             toast.error(t('error_invalid_mac'));
             return;
         }
+
+        // 2. ตรวจสอบว่าบังคับกรอกหรือไม่: ซึ่งจะทำก็ต่อเมื่อช่องนั้นว่าง
+        if (isMacRequired && !formData.macAddress) {
+            toast.error("MAC Address is required for this product category.");
+            return;
+        }
+        // --- END ---
 
         if (!formData.productModelId) {
             toast.error(t('error_select_model'));

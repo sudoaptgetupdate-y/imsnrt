@@ -1,5 +1,3 @@
-// ims-backend/controllers/inventoryController.js
-
 const prisma = require('../prisma/client');
 const { ItemType, EventType, ItemOwner } = require('@prisma/client');
 const inventoryController = {};
@@ -20,7 +18,6 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 
 inventoryController.addInventoryItem = async (req, res, next) => {
     try {
-        // --- 1. รับ `notes` จาก request body ---
         const { serialNumber, macAddress, productModelId, supplierId, notes } = req.body;
         const userId = req.user.id;
 
@@ -55,14 +52,13 @@ inventoryController.addInventoryItem = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
+        // Updated MAC Address Validation
         if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        }
-
-        if (macAddress && (typeof macAddress !== 'string' || !macRegex.test(macAddress))) {
-            const err = new Error('Invalid MAC Address format.');
+        } else if (macAddress && !macRegex.test(macAddress)) {
+            const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
         }
@@ -74,7 +70,7 @@ inventoryController.addInventoryItem = async (req, res, next) => {
                     ownerType: ItemOwner.COMPANY,
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
-                    notes: notes || null, // --- 2. เพิ่ม `notes` ตอนสร้างข้อมูล ---
+                    notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: parsedSupplierId,
                     addedById: userId,
@@ -141,10 +137,10 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
                 if (category.requiresSerialNumber && (!item.serialNumber || item.serialNumber.trim() === '')) {
                     throw new Error(`Serial Number is required for all items in this batch.`);
                 }
+                // Updated MAC Address Validation
                 if (category.requiresMacAddress && (!item.macAddress || item.macAddress.trim() === '')) {
                     throw new Error(`MAC Address is required for all items in this batch.`);
-                }
-                if (item.macAddress && (typeof item.macAddress !== 'string' || !macRegex.test(item.macAddress))) {
+                } else if (item.macAddress && !macRegex.test(item.macAddress)) {
                     throw new Error(`Invalid MAC Address format for one of the items: ${item.macAddress}`);
                 }
 
@@ -154,7 +150,7 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
                         ownerType: ItemOwner.COMPANY,
                         serialNumber: item.serialNumber || null,
                         macAddress: item.macAddress || null,
-                        notes: item.notes || null, // --- 3. เพิ่ม `notes` ตอนสร้างแบบ Batch ---
+                        notes: item.notes || null,
                         productModelId: parsedModelId,
                         supplierId: parsedSupplierId,
                         addedById: userId,
@@ -185,8 +181,6 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
     }
 };
 
-// ... (getAllInventoryItems และ getInventoryItemById ไม่ต้องแก้ไข)
-
 inventoryController.getAllInventoryItems = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -199,21 +193,17 @@ inventoryController.getAllInventoryItems = async (req, res, next) => {
         const brandIdFilter = req.query.brandId || 'All';
         const sortBy = req.query.sortBy || 'updatedAt';
         const sortOrder = req.query.sortOrder || 'desc';
-        // --- START: รับ excludeIds จาก query string ---
         const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',').map(id => parseInt(id.trim())) : [];
-        // --- END ---
         
         let where = { 
             itemType: ItemType.SALE
         };
 
-        // --- START: เพิ่มเงื่อนไขการกรอง excludeIds ---
         if (excludeIds.length > 0) {
             where.id = {
                 notIn: excludeIds
             };
         }
-        // --- END ---
 
         if (statusFilter && statusFilter !== 'All') {
             where.status = statusFilter;
@@ -352,12 +342,10 @@ inventoryController.getInventoryItemById = async (req, res, next) => {
     }
 };
 
-
 inventoryController.updateInventoryItem = async (req, res, next) => {
     const { id } = req.params;
     const actorId = req.user.id;
     try {
-        // --- 4. รับ `notes` จาก request body ---
         const { serialNumber, macAddress, status, productModelId, supplierId, notes } = req.body;
         
         const itemId = parseInt(id);
@@ -389,14 +377,13 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
+        // Updated MAC Address Validation
         if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        }
-
-        if (macAddress && (typeof macAddress !== 'string' || !macRegex.test(macAddress))) {
-            const err = new Error('Invalid MAC Address format.');
+        } else if (macAddress && !macRegex.test(macAddress)) {
+            const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
         }
@@ -408,7 +395,7 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
                     status,
-                    notes: notes || null, // --- 5. เพิ่ม `notes` ตอนอัปเดตข้อมูล ---
+                    notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId, 10) : null,
                 },
@@ -428,7 +415,6 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
     }
 };
 
-// ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข)
 inventoryController.deleteInventoryItem = async (req, res, next) => {
     const { id } = req.params;
     try {

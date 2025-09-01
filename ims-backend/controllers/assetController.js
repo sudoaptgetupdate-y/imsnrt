@@ -1,4 +1,3 @@
-// ims-backend/controllers/assetController.js
 const prisma = require('../prisma/client');
 const { ItemType, EventType } = require('@prisma/client');
 const assetController = {};
@@ -19,7 +18,6 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 
 assetController.createAsset = async (req, res, next) => {
     try {
-        // --- 1. รับ `notes` จาก request body ---
         const { serialNumber, macAddress, productModelId, assetCode, supplierId, notes } = req.body;
         const userId = req.user.id;
 
@@ -53,14 +51,13 @@ assetController.createAsset = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
+        // Updated MAC Address Validation
         if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        }
-
-        if (macAddress && (typeof macAddress !== 'string' || !macRegex.test(macAddress))) {
-            const err = new Error('Invalid MAC Address format.');
+        } else if (macAddress && !macRegex.test(macAddress)) {
+            const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
         }
@@ -72,7 +69,7 @@ assetController.createAsset = async (req, res, next) => {
                     assetCode: assetCode,
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
-                    notes: notes || null, // --- 2. เพิ่ม `notes` ตอนสร้างข้อมูล ---
+                    notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId) : null,
                     addedById: userId,
@@ -135,10 +132,10 @@ assetController.addBatchAssets = async (req, res, next) => {
                 if (category.requiresSerialNumber && (!item.serialNumber || item.serialNumber.trim() === '')) {
                     throw new Error(`Serial Number is required for Asset Code ${item.assetCode}.`);
                 }
+                // Updated MAC Address Validation
                 if (category.requiresMacAddress && (!item.macAddress || item.macAddress.trim() === '')) {
                     throw new Error(`MAC Address is required for Asset Code ${item.assetCode}.`);
-                }
-                if (item.macAddress && (typeof item.macAddress !== 'string' || !macRegex.test(item.macAddress))) {
+                } else if (item.macAddress && !macRegex.test(item.macAddress)) {
                     throw new Error(`Invalid MAC Address format for Asset Code ${item.assetCode}.`);
                 }
 
@@ -149,7 +146,7 @@ assetController.addBatchAssets = async (req, res, next) => {
                         assetCode: item.assetCode,
                         serialNumber: item.serialNumber || null,
                         macAddress: item.macAddress || null,
-                        notes: item.notes || null, // --- 3. เพิ่ม `notes` ตอนสร้างแบบ Batch ---
+                        notes: item.notes || null,
                         productModelId: parsedModelId,
                         supplierId: supplierId ? parseInt(supplierId) : null,
                         addedById: userId,
@@ -183,7 +180,6 @@ assetController.updateAsset = async (req, res, next) => {
     const { id } = req.params;
     const actorId = req.user.id;
     try {
-        // --- 4. รับ `notes` จาก request body ---
         const { assetCode, serialNumber, macAddress, status, productModelId, supplierId, notes } = req.body;
 
         const assetId = parseInt(id);
@@ -220,14 +216,13 @@ assetController.updateAsset = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
+        // Updated MAC Address Validation
         if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        }
-
-        if (macAddress && (typeof macAddress !== 'string' || !macRegex.test(macAddress))) {
-            const err = new Error('Invalid MAC Address format.');
+        } else if (macAddress && !macRegex.test(macAddress)) {
+            const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
         }
@@ -247,7 +242,7 @@ assetController.updateAsset = async (req, res, next) => {
                     serialNumber: serialNumber || null,
                     macAddress: macAddress || null,
                     status,
-                    notes: notes || null, // --- 5. เพิ่ม `notes` ตอนอัปเดตข้อมูล ---
+                    notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId, 10) : null,
                 },
@@ -269,8 +264,6 @@ assetController.updateAsset = async (req, res, next) => {
         next(error);
     }
 };
-
-// ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข)
 
 assetController.deleteAsset = async (req, res, next) => {
     const { id } = req.params;
@@ -335,21 +328,17 @@ assetController.getAllAssets = async (req, res, next) => {
         const brandIdFilter = req.query.brandId || 'All';
         const sortBy = req.query.sortBy || 'updatedAt';
         const sortOrder = req.query.sortOrder || 'desc';
-        // --- START: รับ excludeIds จาก query string ---
         const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',').map(id => parseInt(id.trim())) : [];
-        // --- END ---
 
         let where = {
             itemType: ItemType.ASSET
         };
 
-        // --- START: เพิ่มเงื่อนไขการกรอง excludeIds ---
         if (excludeIds.length > 0) {
             where.id = {
                 notIn: excludeIds
             };
         }
-        // --- END ---
 
         if (searchTerm) {
             where.OR = [
@@ -376,12 +365,11 @@ assetController.getAllAssets = async (req, res, next) => {
             orderBy = { productModel: { modelNumber: sortOrder } };
         } else if (sortBy === 'category') {
             orderBy = { productModel: { category: { name: sortOrder } } };
-        } else if (sortBy === 'brand') { // --- START: แก้ไขส่วนนี้ ---
+        } else if (sortBy === 'brand') {
             orderBy = { productModel: { brand: { name: sortOrder } } };
         } else {
             orderBy = { [sortBy]: sortOrder };
         }
-        // --- END: แก้ไขส่วนนี้ ---
 
         const include = {
             productModel: { include: { category: true, brand: true } },
