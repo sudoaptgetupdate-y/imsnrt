@@ -9,12 +9,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Layers, Eye, EyeOff, Loader2 } from 'lucide-react'; 
-import { useTranslation } from 'react-i18next'; // --- 1. Import useTranslation ---
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+// --- START: 1. Import รูปภาพ ---
+import ntBackground from '@/assets/nt-background.png';
+import ntLogo from '@/assets/nt-logo.png';
+// --- END ---
 
 export default function LoginPage() {
     const navigate = useNavigate();
-    const { t } = useTranslation(); // --- 2. เรียกใช้ useTranslation ---
+    const { t } = useTranslation();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -34,12 +38,12 @@ export default function LoginPage() {
             
             const { token, user } = response.data;
             login(token, user);
-            toast.success(t('welcome_message', { name: user.name })); // --- 3. แปลข้อความ ---
+            toast.success(t('welcome_message', { name: user.name }));
             navigate('/dashboard');
 
         } catch (error) {
             console.error("Login failed:", error);
-            const errorMessage = error.response?.data?.error || t('login_failed_error'); // --- 3. แปลข้อความ ---
+            const errorMessage = error.response?.data?.error || t('login_failed_error');
             toast.error(errorMessage);
         } finally {
             setIsLoading(false);
@@ -52,16 +56,23 @@ export default function LoginPage() {
 
     return (
         <div className="flex items-center justify-center min-h-screen relative p-4">
+             {/* --- START: 2. แก้ไข src --- */}
              <img 
-                src="/my-backgroud.jpg"
+                src={ntBackground}
                 alt="Background"
                 className="absolute inset-0 h-full w-full object-cover z-0"
             />
+            {/* --- END --- */}
             
-            {/* --- 3. แปลข้อความ --- */}
             <Card className="mx-auto w-full max-w-sm z-20 shadow-xl bg-white/80 backdrop-blur-lg border border-white/20">
-                <CardHeader className="text-center">
-                    <Layers className="mx-auto h-10 w-10 text-primary" />
+                <CardHeader className="text-center flex flex-col items-center">
+                    {/* --- START: 2. แก้ไข src --- */}
+                    <img
+                        src={ntLogo}
+                        alt="Logo"
+                        className="h-16 w-auto"
+                    />
+                    {/* --- END --- */}
                     <CardTitle className="text-2xl font-bold mt-4">
                         {t('login_title')}
                     </CardTitle>

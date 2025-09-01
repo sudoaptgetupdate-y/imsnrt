@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     LogOut, Menu, User, ArrowRightLeft, Building2, 
     ShoppingCart, Settings, Package, Boxes, Tag, Users as UsersIcon, 
-    HardDrive, Layers, Wrench, BookUser, Truck, Building, BarChart2
+    HardDrive, Wrench, BookUser, Truck, Building, BarChart2
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { toast } from 'sonner';
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
+import ntHeadLogo from '@/assets/nt-head-logo2.png';
 
 
 const Footer = () => {
@@ -89,7 +90,6 @@ const MainLayout = () => {
     const navRef = useRef(null);
     const scrollPos = useRef(null);
 
-    // --- START: โค้ดส่วนจัดการ Idle Timeout ---
     const handleIdle = useCallback(() => {
         console.log("handleIdle function called. Logging out...");
         toast.warning("You have been logged out due to inactivity.");
@@ -97,10 +97,7 @@ const MainLayout = () => {
         navigate('/login');
     }, [navigate, logout]);
 
-    // ตั้งเวลา 10 นาที (10 * 60 * 1000 = 600000 ms)
-    // หากต้องการทดสอบ ให้เปลี่ยนเป็น 60000 (1 นาที)
     useIdleTimeout(handleIdle, 600000); 
-    // --- END: โค้ดส่วนจัดการ Idle Timeout ---
 
     const handleNavLinkClick = () => {
         if (navRef.current) {
@@ -128,10 +125,12 @@ const MainLayout = () => {
 
     const SidebarContent = () => (
         <div className="flex flex-col h-full relative">
-            <Link to="/dashboard" className="p-4 border-b flex items-center gap-3 h-[65px] hover:bg-muted/50 transition-colors">
-                <div className="bg-primary p-2 rounded-lg">
-                    <Layers className="text-primary-foreground" size={24}/>
-                </div>
+            <Link to="/dashboard" className="p-4 border-b flex items-center gap-2 h-[65px] hover:bg-muted/50 transition-colors">
+                <img
+                    src={ntHeadLogo}
+                    alt="Logo"
+                    className="h-8 w-auto"
+                />
                 <h1 className={cn("text-lg font-bold text-slate-800 transition-all whitespace-nowrap", isSidebarCollapsed && "opacity-0 hidden")}>
                     Engineer IMS
                 </h1>
@@ -160,7 +159,8 @@ const MainLayout = () => {
                     </p>
                      <div className="space-y-1">
                         <NavItem to="/inventory" icon={<Package size={18}/>} text={t('inventory')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                        <NavItem to="/assets" icon={<Layers size={18}/>} text={t('assetList')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                        {/* This NavItem for assets uses a Layers icon that is not defined. */}
+                        <NavItem to="/assets" icon={<Package size={18}/>} text={t('assetList')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/product-models" icon={<Boxes size={18}/>} text={t('models')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/brands" icon={<Building2 size={18}/>} text={t('brands')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/categories" icon={<Tag size={18}/>} text={t('categories')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
