@@ -5,17 +5,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
 import { toast } from 'sonner';
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-import { PlusCircle, XCircle } from "lucide-react";
+import { PlusCircle, XCircle, Download, Upload } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import Papa from 'papaparse';
 
-const MAX_ITEMS_MANUAL = 10;
+const MAX_ITEMS_MANUAL = 50;
 const FIELDS_PER_ROW = 3; // serialNumber, macAddress, notes
 
 const formatMacAddress = (value) => {
@@ -34,12 +33,12 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
     const [selectedModel, setSelectedModel] = useState(null);
     const [selectedSupplierId, setSelectedSupplierId] = useState("");
     const [manualItems, setManualItems] = useState([{ serialNumber: '', macAddress: '', notes: '' }]);
-    const [listText, setListText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const token = useAuthStore((state) => state.token);
 
     const inputRefs = useRef([]);
     const firstInputRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && selectedModel) {
@@ -76,7 +75,7 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                 inputRefs.current[nextIndex]?.focus();
             }, 100);
         } else {
-            toast.info(`You can add a maximum of ${MAX_ITEMS_MANUAL} items at a time.`);
+            toast.info(`You can add or import a maximum of ${MAX_ITEMS_MANUAL} items at a time.`);
         }
     };
 
@@ -87,138 +86,125 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
 
     const handleKeyDown = (e, rowIndex, fieldIndex) => {
         const currentRefIndex = rowIndex * FIELDS_PER_ROW + fieldIndex;
-
         const focusNext = () => {
             const nextRefIndex = currentRefIndex + 1;
-            if (inputRefs.current[nextRefIndex]) {
-                inputRefs.current[nextRefIndex].focus();
-            } else if (rowIndex < manualItems.length - 1) { 
-                const nextRowFirstInput = (rowIndex + 1) * FIELDS_PER_ROW;
-                if (inputRefs.current[nextRowFirstInput]) {
-                     inputRefs.current[nextRowFirstInput].focus();
-                }
-            }
+            if (inputRefs.current[nextRefIndex]) inputRefs.current[nextRefIndex].focus();
         };
-
         const focusPrev = () => {
             const prevRefIndex = currentRefIndex - 1;
-            if (inputRefs.current[prevRefIndex]) {
-                inputRefs.current[prevRefIndex].focus();
-            }
+            if (inputRefs.current[prevRefIndex]) inputRefs.current[prevRefIndex].focus();
         };
-        
         if (e.key === 'Enter' || e.key === 'ArrowDown') {
             e.preventDefault();
             const nextRowIndex = rowIndex + 1;
-            if (nextRowIndex === manualItems.length) {
-                addManualItemRow();
-            } else {
-                const nextFieldIndex = nextRowIndex * FIELDS_PER_ROW + fieldIndex;
-                inputRefs.current[nextFieldIndex]?.focus();
-            }
+            if (nextRowIndex === manualItems.length) addManualItemRow();
+            else inputRefs.current[nextRowIndex * FIELDS_PER_ROW + fieldIndex]?.focus();
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             const prevRowIndex = rowIndex - 1;
-            if (prevRowIndex >= 0) {
-                 const prevFieldIndex = prevRowIndex * FIELDS_PER_ROW + fieldIndex;
-                 inputRefs.current[prevFieldIndex]?.focus();
-            }
+            if (prevRowIndex >= 0) inputRefs.current[prevRowIndex * FIELDS_PER_ROW + fieldIndex]?.focus();
         } else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) {
-             e.preventDefault();
-             focusNext();
+            e.preventDefault();
+            focusNext();
         } else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) {
             e.preventDefault();
             focusPrev();
         }
     };
 
-    const handleSubmit = async (activeTab) => {
-        if (!selectedModel) {
-            toast.error("Please select a Product Model first.");
-            return;
-        }
-        if (!selectedSupplierId) {
-            toast.error("Please select a Supplier.");
-            return;
-        }
+    const handleDownloadTemplate = () => {
+        const headers = ["SerialNumber", "MACAddress", "Notes"];
+        const csv = Papa.unparse([headers]);
+        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "inventory_template.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
+    const handleFileImport = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                const importedData = results.data.map(row => ({
+                    serialNumber: row.SerialNumber || '',
+                    macAddress: row.MACAddress || '',
+                    notes: row.Notes || '',
+                }));
+                const existingItems = manualItems.filter(item => item.serialNumber || item.macAddress || item.notes);
+                const combinedItems = [...existingItems, ...importedData];
+                if (combinedItems.length > MAX_ITEMS_MANUAL) {
+                    toast.error(`Cannot import ${importedData.length} items. The total would exceed the limit of ${MAX_ITEMS_MANUAL}.`);
+                    return;
+                }
+                setManualItems(combinedItems.length > 0 ? combinedItems : [{ serialNumber: '', macAddress: '', notes: '' }]);
+                toast.success(`${importedData.length} rows imported successfully.`);
+            },
+            error: (error) => toast.error("Failed to parse CSV file: " + error.message)
+        });
+        event.target.value = null;
+    };
+
+    const handleSubmit = async () => {
         setIsLoading(true);
-
-        let itemsPayload = [];
-        let errorMessages = [];
-        const { requiresSerialNumber, requiresMacAddress } = selectedModel.category;
-        
-        const processItem = (item, identifier) => {
-            let hasValidationError = false;
-
-            if (requiresSerialNumber && (!item.serialNumber || !item.serialNumber.trim())) {
-                errorMessages.push(`Serial Number is required for: ${identifier}`);
-                hasValidationError = true;
-            }
-            if (requiresMacAddress && (!item.macAddress || !item.macAddress.trim())) {
-                errorMessages.push(`MAC Address is required for: ${identifier}`);
-                hasValidationError = true;
-            }
-            if (item.macAddress && !validateMacAddress(item.macAddress.trim())) {
-                errorMessages.push(`Invalid MAC Address format for: ${identifier}`);
-                hasValidationError = true;
-            }
-            
-            return hasValidationError ? null : {
-                serialNumber: item.serialNumber?.trim() || null,
-                macAddress: item.macAddress?.trim() || null,
-                notes: item.notes?.trim() || null,
-            };
-        };
-
-
-        if (activeTab === 'manual') {
-            itemsPayload = manualItems
-                .filter(item => item.serialNumber?.trim() || item.macAddress?.trim())
-                .map(item => processItem(item, item.serialNumber || `Row ${manualItems.indexOf(item) + 1}`))
-                .filter(Boolean);
-        } else {
-            itemsPayload = listText
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#'))
-                .map(line => {
-                    const parts = line.split(/[,\t]/).map(part => part.trim());
-                    const [serialNumber, macAddress, notes] = parts;
-                    const item = { serialNumber, macAddress, notes };
-                    return processItem(item, serialNumber || `Line ${listText.split('\n').indexOf(line) + 1}`);
-                })
-                .filter(Boolean);
-        }
-        
-        if (errorMessages.length > 0) {
-            const uniqueErrors = [...new Set(errorMessages)];
-            toast.error(uniqueErrors.join('\n'));
-            setIsLoading(false);
-            return;
-        }
-
-        if (itemsPayload.length === 0) {
-            toast.error("Please add at least one valid item to save.");
-            setIsLoading(false);
-            return;
-        }
-
-        const payload = {
-            productModelId: selectedModel.id,
-            supplierId: selectedSupplierId ? parseInt(selectedSupplierId) : null,
-            items: itemsPayload,
-        };
-
         try {
+            if (!selectedModel) throw new Error(t('error_select_model'));
+            if (!selectedSupplierId) throw new Error(t('error_select_supplier'));
+
+            const { requiresSerialNumber, requiresMacAddress } = selectedModel.category;
+            let errorMessages = [];
+
+            const processItem = (item, identifier) => {
+                if (requiresSerialNumber && !item.serialNumber?.trim()) {
+                    errorMessages.push(`Serial Number is required for: ${identifier}`);
+                }
+                if (requiresMacAddress && !item.macAddress?.trim()) {
+                    errorMessages.push(`MAC Address is required for: ${identifier}`);
+                }
+                if (item.macAddress && !validateMacAddress(item.macAddress.trim())) {
+                    errorMessages.push(`Invalid MAC Address format for: ${identifier}`);
+                }
+                return {
+                    serialNumber: item.serialNumber?.trim() || null,
+                    macAddress: item.macAddress?.trim() || null,
+                    notes: item.notes?.trim() || null,
+                };
+            };
+
+            const itemsPayload = manualItems
+                .filter(item => item.serialNumber?.trim() || item.macAddress?.trim())
+                .map((item, index) => processItem(item, item.serialNumber || `Row ${index + 1}`));
+
+            if (errorMessages.length > 0) {
+                throw new Error([...new Set(errorMessages)].join('\n'));
+            }
+
+            if (itemsPayload.length === 0) {
+                throw new Error("Please add at least one valid item to save.");
+            }
+
+            const payload = {
+                productModelId: selectedModel.id,
+                supplierId: parseInt(selectedSupplierId),
+                items: itemsPayload,
+            };
+
             const response = await axiosInstance.post('/inventory/batch', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             toast.success(response.data.message);
             onSave();
             handleClose();
+
         } catch (error) {
-            toast.error(error.response?.data?.error || "Failed to add items.");
+            toast.error(error.response?.data?.error || error.message || "An unexpected error occurred.");
         } finally {
             setIsLoading(false);
         }
@@ -229,11 +215,9 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         setSelectedModel(null);
         setSelectedSupplierId("");
         setManualItems([{ serialNumber: '', macAddress: '', notes: '' }]);
-        setListText("");
     };
 
     const manualItemCount = manualItems.filter(i => i.serialNumber?.trim() || i.macAddress?.trim()).length;
-    const listItemCount = listText.split('\n').filter(l => l.trim() && !l.startsWith('#')).length;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -257,102 +241,75 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                         </div>
                     </div>
                     {selectedModel && (
-                        <Tabs defaultValue="manual" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="manual">{t('batch_add_manual_tab')}</TabsTrigger>
-                                <TabsTrigger value="list">{t('batch_add_list_tab')}</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="manual" className="mt-4">
-                                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-                                    <div className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
-                                        <Label>
-                                            {t('tableHeader_serialNumber')}
-                                            {selectedModel.category.requiresSerialNumber && <span className="text-red-500 ml-1">*</span>}
-                                        </Label>
-                                        <Label>
-                                            {t('tableHeader_macAddress')}
-                                            {selectedModel.category.requiresMacAddress && <span className="text-red-500 ml-1">*</span>}
-                                        </Label>
-                                        <Label>{t('notes')}</Label>
-                                        <div className="w-9"></div>
-                                    </div>
-                                    {manualItems.map((item, index) => (
-                                        <div key={index} className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2">
-                                            <Input
-                                                ref={el => {
-                                                    inputRefs.current[index * FIELDS_PER_ROW] = el;
-                                                    if (index === 0) firstInputRef.current = el;
-                                                }}
-                                                placeholder={t('tableHeader_serialNumber')}
-                                                value={item.serialNumber}
-                                                onChange={(e) => handleInputChange(e, index, 'serialNumber')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 0)}
-                                                disabled={!selectedModel}
-                                            />
-                                            <Input
-                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 1] = el}
-                                                placeholder={t('tableHeader_macAddress')}
-                                                value={item.macAddress}
-                                                onChange={(e) => handleInputChange(e, index, 'macAddress')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 1)}
-                                                disabled={!selectedModel}
-                                            />
-                                            <Input
-                                                ref={el => inputRefs.current[index * FIELDS_PER_ROW + 2] = el}
-                                                placeholder={t('notes')}
-                                                value={item.notes}
-                                                onChange={(e) => handleInputChange(e, index, 'notes')}
-                                                onKeyDown={(e) => handleKeyDown(e, index, 2)}
-                                            />
-                                            <Button variant="ghost" size="icon" onClick={() => removeManualItemRow(index)} disabled={manualItems.length === 1}>
-                                                <XCircle className="h-5 w-5 text-red-500" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                                <Button variant="outline" size="sm" onClick={addManualItemRow} className="mt-3">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> {t('batch_add_row_button')}
+                        <div>
+                            <div className="flex justify-end gap-2 mb-4">
+                                <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download Template
                                 </Button>
-                                <DialogFooter className="mt-6">
-                                    <DialogClose asChild><Button type="button" variant="ghost">{t('cancel')}</Button></DialogClose>
-                                    <Button onClick={() => handleSubmit('manual')} disabled={isLoading}>
-                                        {isLoading ? t('saving') : t('batch_add_save_button', { count: manualItemCount })}
-                                    </Button>
-                                </DialogFooter>
-                            </TabsContent>
-                            <TabsContent value="list" className="mt-4">
-                               <Label htmlFor="list-input">{t('batch_add_list_label')}</Label>
-                               <p className="text-xs text-muted-foreground mb-2">Each item must be on a new line. Use a <strong>Tab</strong> or a <strong>comma (,)</strong> to separate Serial Number, MAC Address, and Notes.</p>
-                                <Textarea
-                                    id="list-input"
-                                    className="h-48 font-mono text-sm"
-                                    placeholder={
-`# Serial Number, MAC Address, Notes
-# Use Tab or comma to separate values. Lines starting with # are ignored.
-
-# Example 1: Full details, separated by Tab
-SN-12345	AA:BB:CC:11:22:33	New stock received today.
-
-# Example 2: Separated by comma, no MAC Address
-SN-12346,,For internal testing only.
-
-# Example 3: No notes
-SN-12347	DD:EE:FF:44:55:66
-
-# Example 4: Only Serial Number (if category allows)
-SN-12348`
-                                    }
-                                    value={listText}
-                                    onChange={(e) => setListText(e.target.value)}
-                                />
-                                 <DialogFooter className="mt-6">
-                                    <DialogClose asChild><Button type="button" variant="ghost">{t('cancel')}</Button></DialogClose>
-                                    <Button onClick={() => handleSubmit('list')} disabled={isLoading}>
-                                        {isLoading ? t('saving') : `Save ${listItemCount} Items`}
-                                    </Button>
-                                </DialogFooter>
-                            </TabsContent>
-                        </Tabs>
+                                <Button variant="outline" size="sm" onClick={() => fileInputRef.current.click()}>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    Import CSV
+                                </Button>
+                                <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+                            </div>
+                            <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2 border rounded-md p-2">
+                                <div className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2 px-1 text-xs font-medium text-muted-foreground sticky top-0 bg-background py-1">
+                                    <Label>
+                                        {t('tableHeader_serialNumber')}
+                                        {selectedModel.category.requiresSerialNumber && <span className="text-red-500 ml-1">*</span>}
+                                    </Label>
+                                    <Label>
+                                        {t('tableHeader_macAddress')}
+                                        {selectedModel.category.requiresMacAddress && <span className="text-red-500 ml-1">*</span>}
+                                    </Label>
+                                    <Label>{t('notes')}</Label>
+                                    <div className="w-9"></div>
+                                </div>
+                                {manualItems.map((item, index) => (
+                                    <div key={index} className="grid grid-cols-[1fr_1fr_1.5fr_auto] items-center gap-2">
+                                        <Input
+                                            ref={el => { inputRefs.current[index * FIELDS_PER_ROW] = el; if (index === 0) firstInputRef.current = el; }}
+                                            placeholder={t('tableHeader_serialNumber')}
+                                            value={item.serialNumber}
+                                            onChange={(e) => handleInputChange(e, index, 'serialNumber')}
+                                            onKeyDown={(e) => handleKeyDown(e, index, 0)}
+                                            disabled={!selectedModel}
+                                        />
+                                        <Input
+                                            ref={el => inputRefs.current[index * FIELDS_PER_ROW + 1] = el}
+                                            placeholder={t('tableHeader_macAddress')}
+                                            value={item.macAddress}
+                                            onChange={(e) => handleInputChange(e, index, 'macAddress')}
+                                            onKeyDown={(e) => handleKeyDown(e, index, 1)}
+                                            disabled={!selectedModel}
+                                        />
+                                        <Input
+                                            ref={el => inputRefs.current[index * FIELDS_PER_ROW + 2] = el}
+                                            placeholder={t('notes')}
+                                            value={item.notes}
+                                            onChange={(e) => handleInputChange(e, index, 'notes')}
+                                            onKeyDown={(e) => handleKeyDown(e, index, 2)}
+                                        />
+                                        <Button variant="ghost" size="icon" onClick={() => removeManualItemRow(index)} disabled={manualItems.length === 1 && !manualItems[0].serialNumber && !manualItems[0].macAddress}>
+                                            <XCircle className="h-5 w-5 text-red-500" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex justify-between items-center mt-3">
+                                <p className="text-xs text-muted-foreground">Showing {manualItems.length} of {MAX_ITEMS_MANUAL} rows.</p>
+                                <Button variant="outline" size="sm" onClick={addManualItemRow}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> {t('add_row_button')}
+                                </Button>
+                            </div>
+                            <DialogFooter className="mt-6">
+                                <DialogClose asChild><Button type="button" variant="ghost">{t('cancel')}</Button></DialogClose>
+                                <Button onClick={handleSubmit} disabled={isLoading}>
+                                    {isLoading ? t('saving') : t('batch_add_save_button', { count: manualItemCount })}
+                                </Button>
+                            </DialogFooter>
+                        </div>
                     )}
                 </div>
             </DialogContent>
