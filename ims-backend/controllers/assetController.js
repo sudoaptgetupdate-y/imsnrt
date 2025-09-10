@@ -347,7 +347,7 @@ assetController.getAllAssets = async (req, res, next) => {
         if (searchTerm) {
             where.OR = [
                 { serialNumber: { contains: searchTerm } },
-                { macAddress: { equals: searchTerm.replace(/[:-\s]/g, '') } },
+                { macAddress: { contains: searchTerm.replace(/[:-\s]/g, '') } },
                 { productModel: { modelNumber: { contains: searchTerm } } },
                 { assetCode: { contains: searchTerm } },
             ];

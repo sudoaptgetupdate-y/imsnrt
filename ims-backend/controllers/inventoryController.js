@@ -294,7 +294,7 @@ inventoryController.getAllInventoryItems = async (req, res, next) => {
             ? {
                 OR: [
                     { serialNumber: { contains: searchTerm } },
-                    { macAddress: { equals: searchTerm.replace(/[:-\s]/g, '') } },
+                    { macAddress: { contains: searchTerm.replace(/[:-\s]/g, '') } },
                     { productModel: { modelNumber: { contains: searchTerm } } },
                 ],
             }
