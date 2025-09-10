@@ -32,6 +32,15 @@ import {
 } from "@/components/ui/table";
 import { useTranslation } from "react-i18next";
 
+// --- START: เพิ่มฟังก์ชันสำหรับจัดรูปแบบ MAC Address ---
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || 'N/A';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+// --- END ---
+
 const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) => {
     const { t } = useTranslation();
     const [selectedToReturn, setSelectedToReturn] = useState([]);
@@ -207,7 +216,9 @@ const PrintableItemsCard = ({ borrowing, t }) => (
                                 <td className="p-2">{boi.inventoryItem?.productModel?.brand?.name || 'N/A'}</td>
                                 <td className="p-2">{boi.inventoryItem?.productModel?.modelNumber || 'N/A'}</td>
                                 <td className="p-2">{boi.inventoryItem?.serialNumber || 'N/A'}</td>
-                                <td className="p-2">{boi.inventoryItem?.macAddress || 'N/A'}</td>
+                                {/* --- START: แก้ไขการแสดงผล MAC Address --- */}
+                                <td className="p-2">{displayFormattedMac(boi.inventoryItem?.macAddress)}</td>
+                                {/* --- END --- */}
                                 <td className="p-2">
                                     {boi.returnedAt ? `${t('status_returned')} (${new Date(boi.returnedAt).toLocaleDateString('th-TH')})` : t('status_borrowed')}
                                 </td>
@@ -231,7 +242,6 @@ export default function BorrowingDetailPage() {
     const [borrowing, setBorrowing] = useState(null);
     const [companyProfile, setCompanyProfile] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [selectedToReturn, setSelectedToReturn] = useState([]);
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
 
     const fetchDetails = async () => {
@@ -371,7 +381,9 @@ export default function BorrowingDetailPage() {
                                                 <TableCell>{boi.inventoryItem?.productModel?.brand?.name || 'N/A'}</TableCell>
                                                 <TableCell>{boi.inventoryItem?.productModel?.modelNumber || 'N/A'}</TableCell>
                                                 <TableCell>{boi.inventoryItem?.serialNumber || 'N/A'}</TableCell>
-                                                <TableCell>{boi.inventoryItem?.macAddress || 'N/A'}</TableCell>
+                                                {/* --- START: แก้ไขการแสดงผล MAC Address --- */}
+                                                <TableCell>{displayFormattedMac(boi.inventoryItem?.macAddress)}</TableCell>
+                                                {/* --- END --- */}
                                                 <TableCell>
                                                     <StatusBadge status={boi.returnedAt ? 'RETURNED' : 'BORROWED'} />
                                                     {boi.returnedAt && (

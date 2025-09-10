@@ -2,7 +2,7 @@ const prisma = require('../prisma/client');
 const { ItemType, EventType, ItemOwner } = require('@prisma/client');
 const inventoryController = {};
 
-const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+const macRegex = /^[0-9A-Fa-f]{12}$/; // Regex for MAC address without separators
 
 // Helper function to create event logs consistently
 const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
@@ -52,12 +52,14 @@ inventoryController.addInventoryItem = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
-        // Updated MAC Address Validation
-        if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
+
+        const cleanMacAddress = macAddress ? macAddress.replace(/[:-\s]/g, '') : '';
+        if (category.requiresMacAddress && !cleanMacAddress) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        } else if (macAddress && !macRegex.test(macAddress)) {
+        }
+        if (cleanMacAddress && !macRegex.test(cleanMacAddress)) {
             const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
@@ -69,7 +71,7 @@ inventoryController.addInventoryItem = async (req, res, next) => {
                     itemType: ItemType.SALE,
                     ownerType: ItemOwner.COMPANY,
                     serialNumber: serialNumber || null,
-                    macAddress: macAddress || null,
+                    macAddress: cleanMacAddress || null,
                     notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: parsedSupplierId,
@@ -137,10 +139,10 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
                 if (category.requiresSerialNumber && (!item.serialNumber || item.serialNumber.trim() === '')) {
                     throw new Error(`Serial Number is required for all items in this batch.`);
                 }
-                // Updated MAC Address Validation
-                if (category.requiresMacAddress && (!item.macAddress || item.macAddress.trim() === '')) {
+                const cleanMacAddress = item.macAddress ? item.macAddress.replace(/[:-\s]/g, '') : '';
+                if (category.requiresMacAddress && !cleanMacAddress) {
                     throw new Error(`MAC Address is required for all items in this batch.`);
-                } else if (item.macAddress && !macRegex.test(item.macAddress)) {
+                } else if (cleanMacAddress && !macRegex.test(cleanMacAddress)) {
                     throw new Error(`Invalid MAC Address format for one of the items: ${item.macAddress}`);
                 }
 
@@ -149,7 +151,7 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
                         itemType: ItemType.SALE,
                         ownerType: ItemOwner.COMPANY,
                         serialNumber: item.serialNumber || null,
-                        macAddress: item.macAddress || null,
+                        macAddress: cleanMacAddress || null,
                         notes: item.notes || null,
                         productModelId: parsedModelId,
                         supplierId: parsedSupplierId,
@@ -173,6 +175,85 @@ inventoryController.addBatchInventoryItems = async (req, res, next) => {
 
         res.status(201).json({
             message: `${newItems.length} items have been added successfully.`,
+            data: newItems,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+inventoryController.addHistoricalInventory = async (req, res, next) => {
+    try {
+        const { items, createdAt } = req.body;
+        const userId = req.user.id;
+
+        if (!Array.isArray(items) || items.length === 0) {
+            const err = new Error('Items list cannot be empty.');
+            err.statusCode = 400;
+            return next(err);
+        }
+        if (!createdAt || isNaN(new Date(createdAt).getTime())) {
+            const err = new Error('A valid creation date (createdAt) is required.');
+            err.statusCode = 400;
+            return next(err);
+        }
+
+        const newItems = await prisma.$transaction(async (tx) => {
+            const createdItems = [];
+            for (const item of items) {
+                if (!item.productModelId || !item.supplierId) {
+                     throw new Error('Product Model ID and Supplier ID are required for all items.');
+                }
+                const productModel = await tx.productModel.findUnique({
+                    where: { id: parseInt(item.productModelId) },
+                    include: { category: true },
+                });
+                if (!productModel) {
+                    throw new Error(`Product Model with ID ${item.productModelId} not found.`);
+                }
+                const { category } = productModel;
+
+                if (category.requiresSerialNumber && (!item.serialNumber || item.serialNumber.trim() === '')) {
+                    throw new Error(`Serial Number is required for model ${productModel.modelNumber}.`);
+                }
+                const cleanMacAddress = item.macAddress ? item.macAddress.replace(/[:-\s]/g, '') : '';
+                if (category.requiresMacAddress && !cleanMacAddress) {
+                     throw new Error(`MAC Address is required for model ${productModel.modelNumber}.`);
+                }
+                if(cleanMacAddress && !macRegex.test(cleanMacAddress)){
+                    throw new Error(`Invalid MAC Address format for S/N ${item.serialNumber}.`);
+                }
+
+                const createdItem = await tx.inventoryItem.create({
+                    data: {
+                        productModelId: parseInt(item.productModelId),
+                        supplierId: parseInt(item.supplierId),
+                        serialNumber: item.serialNumber,
+                        macAddress: cleanMacAddress || null,
+                        itemType: ItemType.SALE,
+                        ownerType: ItemOwner.COMPANY,
+                        addedById: userId,
+                        status: 'IN_STOCK',
+                        createdAt: new Date(createdAt),
+                    },
+                });
+
+                await createEventLog(
+                    tx,
+                    createdItem.id,
+                    userId,
+                    EventType.CREATE,
+                    { details: `Item created via historical entry with S/N: ${createdItem.serialNumber || 'N/A'}.` }
+                );
+                
+                createdItems.push(createdItem);
+            }
+            return createdItems;
+        });
+
+        res.status(201).json({
+            message: `${newItems.length} items have been added successfully with a historical date.`,
             data: newItems,
         });
 
@@ -213,7 +294,7 @@ inventoryController.getAllInventoryItems = async (req, res, next) => {
             ? {
                 OR: [
                     { serialNumber: { contains: searchTerm } },
-                    { macAddress: { equals: searchTerm } },
+                    { macAddress: { equals: searchTerm.replace(/[:-\s]/g, '') } },
                     { productModel: { modelNumber: { contains: searchTerm } } },
                 ],
             }
@@ -377,12 +458,13 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
-        // Updated MAC Address Validation
-        if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
+        const cleanMacAddressForUpdate = macAddress ? macAddress.replace(/[:-\s]/g, '') : '';
+        if (category.requiresMacAddress && !cleanMacAddressForUpdate) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        } else if (macAddress && !macRegex.test(macAddress)) {
+        }
+        if (cleanMacAddressForUpdate && !macRegex.test(cleanMacAddressForUpdate)) {
             const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
@@ -393,7 +475,7 @@ inventoryController.updateInventoryItem = async (req, res, next) => {
                 where: { id: itemId, itemType: 'SALE' },
                 data: {
                     serialNumber: serialNumber || null,
-                    macAddress: macAddress || null,
+                    macAddress: cleanMacAddressForUpdate || null,
                     status,
                     notes: notes || null,
                     productModelId: parsedModelId,

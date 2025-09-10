@@ -2,7 +2,7 @@ const prisma = require('../prisma/client');
 const { ItemType, EventType } = require('@prisma/client');
 const assetController = {};
 
-const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+const macRegex = /^[0-9A-Fa-f]{12}$/; // Regex for MAC address without separators
 
 // Helper function to create event logs consistently
 const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
@@ -51,12 +51,14 @@ assetController.createAsset = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
-        // Updated MAC Address Validation
-        if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
+        
+        const cleanMacAddress = macAddress ? macAddress.replace(/[:-\s]/g, '') : '';
+        if (category.requiresMacAddress && !cleanMacAddress) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        } else if (macAddress && !macRegex.test(macAddress)) {
+        }
+        if (cleanMacAddress && !macRegex.test(cleanMacAddress)) {
             const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
@@ -68,7 +70,7 @@ assetController.createAsset = async (req, res, next) => {
                     itemType: ItemType.ASSET,
                     assetCode: assetCode,
                     serialNumber: serialNumber || null,
-                    macAddress: macAddress || null,
+                    macAddress: cleanMacAddress || null,
                     notes: notes || null,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId) : null,
@@ -132,10 +134,10 @@ assetController.addBatchAssets = async (req, res, next) => {
                 if (category.requiresSerialNumber && (!item.serialNumber || item.serialNumber.trim() === '')) {
                     throw new Error(`Serial Number is required for Asset Code ${item.assetCode}.`);
                 }
-                // Updated MAC Address Validation
-                if (category.requiresMacAddress && (!item.macAddress || item.macAddress.trim() === '')) {
+                const cleanMacAddress = item.macAddress ? item.macAddress.replace(/[:-\s]/g, '') : '';
+                if (category.requiresMacAddress && !cleanMacAddress) {
                     throw new Error(`MAC Address is required for Asset Code ${item.assetCode}.`);
-                } else if (item.macAddress && !macRegex.test(item.macAddress)) {
+                } else if (cleanMacAddress && !macRegex.test(cleanMacAddress)) {
                     throw new Error(`Invalid MAC Address format for Asset Code ${item.assetCode}.`);
                 }
 
@@ -145,7 +147,7 @@ assetController.addBatchAssets = async (req, res, next) => {
                         status: 'IN_WAREHOUSE',
                         assetCode: item.assetCode,
                         serialNumber: item.serialNumber || null,
-                        macAddress: item.macAddress || null,
+                        macAddress: cleanMacAddress || null,
                         notes: item.notes || null,
                         productModelId: parsedModelId,
                         supplierId: supplierId ? parseInt(supplierId) : null,
@@ -216,12 +218,14 @@ assetController.updateAsset = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
-        // Updated MAC Address Validation
-        if (category.requiresMacAddress && (!macAddress || macAddress.trim() === '')) {
+        
+        const cleanMacAddressForUpdate = macAddress ? macAddress.replace(/[:-\s]/g, '') : '';
+        if (category.requiresMacAddress && !cleanMacAddressForUpdate) {
             const err = new Error('MAC Address is required for this category.');
             err.statusCode = 400;
             return next(err);
-        } else if (macAddress && !macRegex.test(macAddress)) {
+        }
+        if (cleanMacAddressForUpdate && !macRegex.test(cleanMacAddressForUpdate)) {
             const err = new Error(`The provided MAC Address '${macAddress}' has an invalid format.`);
             err.statusCode = 400;
             return next(err);
@@ -240,7 +244,7 @@ assetController.updateAsset = async (req, res, next) => {
                 data: {
                     assetCode,
                     serialNumber: serialNumber || null,
-                    macAddress: macAddress || null,
+                    macAddress: cleanMacAddressForUpdate || null,
                     status,
                     notes: notes || null,
                     productModelId: parsedModelId,
@@ -343,7 +347,7 @@ assetController.getAllAssets = async (req, res, next) => {
         if (searchTerm) {
             where.OR = [
                 { serialNumber: { contains: searchTerm } },
-                { macAddress: { equals: searchTerm } },
+                { macAddress: { equals: searchTerm.replace(/[:-\s]/g, '') } },
                 { productModel: { modelNumber: { contains: searchTerm } } },
                 { assetCode: { contains: searchTerm } },
             ];

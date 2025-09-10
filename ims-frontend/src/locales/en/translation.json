@@ -596,5 +596,22 @@
   "item_history_description_title": "Details and specifications for the selected item.",
   "company_profile": "Company Profile",
   "borrowing_details_card_title": "Borrowing Details",
-  "sale_details_card_title": "Sale Details"
+  "sale_details_card_title": "Sale Details",
+  "historical_entry_title": "Historical Data Entry",
+  "historical_entry_description": "Use this form to enter past inventory and sales records. This is for Super Admins only.",
+  "historical_item_creation_date": "Item Creation Date",
+  "historical_sale_date": "Sale Date",
+  "historical_add_item_to_sale": "Add Item to Sale",
+  "historical_add_item_button": "Add Item",
+  "historical_items_to_create": "Items to be Created & Sold ({{count}})",
+  "historical_submit_button": "Submit Historical Data",
+  "historical_menu_item": "Historical Data",
+  "error_select_model_and_supplier": "Please select a Product Model and Supplier.",
+  "error_serial_required_category": "Serial Number is required for this product category.",
+  "error_mac_required_category": "MAC Address is required for this product category.",
+  "error_historical_all_fields_required": "Please fill all required fields and add at least one item.",
+  "error_historical_invalid_mac": "Invalid MAC Address '{mac}' for item '{model}' (S/N: {sn}).",
+  "error_mac_required_for_item": "MAC Address is required for item '{model}' (S/N: {sn}).",
+  "success_historical_created": "Historical data has been successfully created!",
+  "error_historical_failed": "Failed to create historical data."
 }

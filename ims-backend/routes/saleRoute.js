@@ -15,6 +15,7 @@ const superAdminAccess = ['SUPER_ADMIN'];
 router.get('/', authCheck, saleController.getAllSales);
 router.get('/:id', authCheck, saleController.getSaleById);
 router.post('/', authCheck, roleCheck(adminAccess), saleController.createSale);
+router.post('/historical', authCheck, roleCheck(superAdminAccess), saleController.createHistoricalSale);
 router.patch('/:id/void', authCheck, roleCheck(superAdminAccess), saleController.voidSale);
 
 

@@ -14,7 +14,24 @@ import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
 import { useTranslation } from "react-i18next";
 import { SupplierCombobox } from "../ui/SupplierCombobox";
-import { Textarea } from "../ui/textarea"; // --- 1. Import Textarea ---
+import { Textarea } from "../ui/textarea";
+
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) return mac || '';
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+
+const formatMacAddress = (value) => {
+  const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+  if (cleaned.length === 0) return '';
+  return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || '';
+};
+
+const validateMacAddress = (mac) => {
+  if (!mac) return true;
+  const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+  return macRegex.test(mac);
+};
 
 export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
     const { t } = useTranslation();
@@ -31,9 +48,9 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
                 productModelId: asset.productModelId,
                 assetCode: asset.assetCode,
                 serialNumber: asset.serialNumber || '',
-                macAddress: asset.macAddress || '',
+                macAddress: displayFormattedMac(asset.macAddress),
                 status: asset.status,
-                notes: asset.notes || '', // --- 2. เพิ่ม `notes` เข้ามาใน state ---
+                notes: asset.notes || '',
                 supplierId: asset.supplierId || "",
             });
             setSelectedModelInfo(asset.productModel);
@@ -61,14 +78,33 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
+    const handleMacAddressChange = (e) => {
+        const formatted = formatMacAddress(e.target.value);
+        setFormData({ ...formData, macAddress: formatted });
+    };
+
     const handleStatusChange = (value) => {
         setFormData(prev => ({...prev, status: value}));
     };
     
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (formData.macAddress && !validateMacAddress(formData.macAddress)) {
+            toast.error(t('error_invalid_mac'));
+            return;
+        }
+        if (isMacRequired && !formData.macAddress) {
+            toast.error("MAC Address is required for this product category.");
+            return;
+        }
+
+        const payload = {
+            ...formData,
+            macAddress: formData.macAddress ? formData.macAddress.replace(/[:-\s]/g, '') : null,
+        }
+
         try {
-            await axiosInstance.put(`/assets/${asset.id}`, formData, {
+            await axiosInstance.put(`/assets/${asset.id}`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             toast.success(t('success_asset_updated'));
@@ -117,7 +153,7 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
                         <div className="space-y-2">
                            <Label>{t('supplier_label')}</Label>
                            <SupplierCombobox
-                                selectedValue={formData.supplierId}
+                                selectedValue={String(formData.supplierId)}
                                 onSelect={handleSupplierSelect}
                                 initialSupplier={initialSupplier}
                            />
@@ -129,17 +165,22 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
                                 <Input id="assetCode" value={formData.assetCode} onChange={handleInputChange} required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="serialNumber">{t('serial_number_label')} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
-                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleInputChange} disabled={!isSerialRequired} />
+                                <Label htmlFor="serialNumber">{t('serial_number_label')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
+                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleInputChange} required={isSerialRequired} />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="macAddress">{t('mac_address_label')} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
-                            <Input id="macAddress" value={formData.macAddress} onChange={handleInputChange} disabled={!isMacRequired} />
+                            <Label htmlFor="macAddress">{t('mac_address_label')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
+                            <Input 
+                                id="macAddress" 
+                                value={formData.macAddress} 
+                                onChange={handleMacAddressChange} 
+                                required={isMacRequired}
+                                maxLength={17}
+                            />
                         </div>
                         
-                        {/* --- 3. เพิ่ม Textarea สำหรับ Notes --- */}
                         <div className="space-y-2">
                             <Label htmlFor="notes">{t('notes_label')}</Label>
                             <Textarea 
@@ -161,3 +202,4 @@ export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
         </Dialog>
     );
 }
+

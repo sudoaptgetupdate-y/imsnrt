@@ -596,5 +596,22 @@
   "item_history_description_title": "รายละเอียดและข้อมูลจำเพาะของรายการที่เลือก",
   "company_profile": "ข้อมูลบริษัท",
   "borrowing_details_card_title": "รายละเอียดการยืม",
-  "sale_details_card_title": "รายละเอียดการขาย"
+  "sale_details_card_title": "รายละเอียดการขาย",
+  "historical_entry_title": "นำเข้าข้อมูลย้อนหลัง",
+  "historical_entry_description": "ใช้ฟอร์มนี้เพื่อป้อนข้อมูลสินค้าคงคลังและการขายย้อนหลัง สำหรับ Super Admin เท่านั้น",
+  "historical_item_creation_date": "วันที่สร้างสินค้า",
+  "historical_sale_date": "วันที่ขาย",
+  "historical_add_item_to_sale": "เพิ่มสินค้าในรายการขาย",
+  "historical_add_item_button": "เพิ่มรายการ",
+  "historical_items_to_create": "รายการที่จะสร้างและขาย ({{count}})",
+  "historical_submit_button": "บันทึกข้อมูลย้อนหลัง",
+  "historical_menu_item": "ข้อมูลย้อนหลัง",
+  "error_select_model_and_supplier": "กรุณาเลือกรุ่นสินค้าและผู้จัดจำหน่าย",
+  "error_serial_required_category": "หมวดหมู่นี้บังคับให้กรอกซีเรียลนัมเบอร์",
+  "error_mac_required_category": "หมวดหมู่นี้บังคับให้กรอก MAC Address",
+  "error_historical_all_fields_required": "กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วนและเพิ่มสินค้าอย่างน้อยหนึ่งรายการ",
+  "error_historical_invalid_mac": "รูปแบบ MAC Address '{mac}' ไม่ถูกต้องสำหรับสินค้า '{model}' (S/N: {sn})",
+  "error_mac_required_for_item": "จำเป็นต้องกรอก MAC Address สำหรับสินค้า '{model}' (S/N: {sn})",
+  "success_historical_created": "สร้างข้อมูลย้อนหลังสำเร็จแล้ว!",
+  "error_historical_failed": "ไม่สามารถสร้างข้อมูลย้อนหลังได้"
 }

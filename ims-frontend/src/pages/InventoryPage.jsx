@@ -32,9 +32,14 @@ import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { useTranslation } from "react-i18next";
 import BatchAddInventoryDialog from "@/components/dialogs/BatchAddInventoryDialog";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
-import { Textarea } from "@/components/ui/textarea"; // --- 1. Import Textarea ---
+import { Textarea } from "@/components/ui/textarea";
 
-// ... (ส่วนคอมโพเนนต์ SkeletonRow, SortableHeader ไม่มีการเปลี่ยนแปลง) ...
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || '-';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
 
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -53,7 +58,7 @@ const initialEditFormData = {
     productModelId: "",
     status: "IN_STOCK",
     supplierId: "",
-    notes: "", // --- 2. เพิ่ม `notes` เข้ามาใน state ---
+    notes: "",
 };
 
 const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, className }) => (
@@ -143,10 +148,12 @@ export default function InventoryPage() {
         if (!item) return;
         setEditingItemId(item.id);
         setEditFormData({
-            serialNumber: item.serialNumber, macAddress: item.macAddress || '',
-            productModelId: item.productModelId, status: item.status,
+            serialNumber: item.serialNumber || '',
+            macAddress: item.macAddress ? displayFormattedMac(item.macAddress) : '',
+            productModelId: item.productModelId,
+            status: item.status,
             supplierId: item.supplierId || "",
-            notes: item.notes || "", // --- 3. ดึงข้อมูล `notes` มาใส่ในฟอร์ม ---
+            notes: item.notes || "",
         });
         setSelectedModelInfo(item.productModel);
         setInitialSupplier(item.supplier);
@@ -188,12 +195,10 @@ export default function InventoryPage() {
             return;
         }
 
-        // 2. ตรวจสอบว่าบังคับกรอกหรือไม่
         if (isMacRequired && !editFormData.macAddress?.trim()) {
             toast.error("MAC Address is required for this product category.");
             return;
         }
-        // --- END ---
 
         if (!editFormData.productModelId) {
             toast.error("Please select a Product Model.");
@@ -206,7 +211,7 @@ export default function InventoryPage() {
 
         const payload = {
             serialNumber: editFormData.serialNumber || null,
-            macAddress: editFormData.macAddress || null,
+            macAddress: editFormData.macAddress ? editFormData.macAddress.replace(/[:-\s]/g, '') : null,
             productModelId: parseInt(editFormData.productModelId, 10),
             status: editFormData.status,
             supplierId: editFormData.supplierId ? parseInt(editFormData.supplierId, 10) : null,
@@ -221,8 +226,7 @@ export default function InventoryPage() {
             toast.error(error.response?.data?.error || `Failed to save item.`);
         }
     };
-
-    // ... (ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข) ...
+    
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         try {
@@ -381,7 +385,7 @@ export default function InventoryPage() {
                                         <TableCell>{item.productModel.brand.name}</TableCell>
                                         <TableCell className="font-medium">{item.productModel.modelNumber}</TableCell>
                                         <TableCell>{item.serialNumber || '-'}</TableCell>
-                                        <TableCell>{item.macAddress || '-'}</TableCell>
+                                        <TableCell>{displayFormattedMac(item.macAddress)}</TableCell>
                                         <TableCell className="text-center">
                                             <StatusBadge
                                                 status={item.status}
@@ -565,22 +569,20 @@ export default function InventoryPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="serialNumber">{t('tableHeader_serialNumber')} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
-                            <Input id="serialNumber" value={editFormData.serialNumber || ''} onChange={handleEditInputChange} required={isSerialRequired} disabled={!isSerialRequired} />
+                            <Label htmlFor="serialNumber">{t('tableHeader_serialNumber')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
+                            <Input id="serialNumber" value={editFormData.serialNumber || ''} onChange={handleEditInputChange} required={isSerialRequired} />
                         </div>
                         <div className="space-y-2">
-                             <Label htmlFor="macAddress">{t('tableHeader_macAddress')} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">(Not Required)</span>}</Label>
+                             <Label htmlFor="macAddress">{t('tableHeader_macAddress')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
                              <Input
                                 id="macAddress"
                                 value={editFormData.macAddress || ''}
                                 onChange={handleEditMacAddressChange}
                                 required={isMacRequired}
-                                disabled={!isMacRequired}
                                 maxLength={17}
                                 placeholder="AA:BB:CC:DD:EE:FF"
                              />
                         </div>
-                        {/* --- 5. เพิ่ม Textarea สำหรับ Notes --- */}
                         <div className="space-y-2">
                             <Label htmlFor="notes">{t('notes')}</Label>
                             <Textarea

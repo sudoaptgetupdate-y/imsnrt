@@ -35,6 +35,13 @@ const eventConfig = {
     REPAIR_FAILED: { icon: <ShieldAlert className="h-4 w-4" /> },
 };
 
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || 'N/A';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+
 
 export default function InventoryHistoryPage() {
     const { itemId } = useParams();
@@ -145,7 +152,7 @@ export default function InventoryHistoryPage() {
                             </div>
                             <div>
                                 <p className="text-muted-foreground">{t('tableHeader_macAddress')}</p>
-                                <p className="font-semibold text-foreground">{itemDetails.macAddress || 'N/A'}</p>
+                                <p className="font-semibold text-foreground">{displayFormattedMac(itemDetails.macAddress)}</p>
                             </div>
                             {itemDetails.supplier && (
                                 <div>
@@ -154,14 +161,12 @@ export default function InventoryHistoryPage() {
                                 </div>
                             )}
                         </div>
-                        {/* --- START: เพิ่มส่วนแสดง Notes --- */}
                         {itemDetails.notes && (
                              <div className="mt-6">
                                 <h4 className="font-semibold">{t('notes')}</h4>
                                 <p className="whitespace-pre-wrap text-sm text-muted-foreground border p-3 rounded-md bg-muted/30">{itemDetails.notes}</p>
                             </div>
                         )}
-                        {/* --- END --- */}
                     </CardContent>
                 </Card>
 

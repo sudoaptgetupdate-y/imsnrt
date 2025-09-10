@@ -270,4 +270,92 @@ saleController.voidSale = async (req, res, next) => {
     }
 };
 
+saleController.createHistoricalSale = async (req, res, next) => {
+    const { customerId, inventoryItemIds, notes, saleDate } = req.body;
+    const soldById = req.user.id;
+
+    if (!saleDate || isNaN(new Date(saleDate).getTime())) {
+        const err = new Error('A valid sale date (saleDate) is required.');
+        err.statusCode = 400;
+        return next(err);
+    }
+    // ... (Validation อื่นๆ เหมือน createSale เดิม) ...
+    const parsedCustomerId = parseInt(customerId, 10);
+    if (isNaN(parsedCustomerId)) {
+         const err = new Error('Customer ID must be a valid number.');
+         err.statusCode = 400;
+         return next(err);
+    }
+    if (!Array.isArray(inventoryItemIds) || inventoryItemIds.length === 0 || inventoryItemIds.some(id => typeof id !== 'number')) {
+        const err = new Error('inventoryItemIds must be a non-empty array of numbers.');
+        err.statusCode = 400;
+        return next(err);
+    }
+
+    try {
+        const sale = await prisma.$transaction(async (tx) => {
+            const itemsToSell = await tx.inventoryItem.findMany({
+                where: { 
+                    id: { in: inventoryItemIds },
+                    status: 'IN_STOCK' // หรือสถานะอื่นที่เหมาะสม
+                },
+                include: { productModel: { select: { sellingPrice: true } } },
+            });
+
+            if (itemsToSell.length !== inventoryItemIds.length) {
+                const err = new Error('One or more items are not available for sale or not found.');
+                err.statusCode = 400;
+                throw err;
+            }
+            
+            // ... (โค้ดคำนวณราคาสินค้าเหมือนเดิม) ...
+            const subtotal = itemsToSell.reduce((sum, item) => sum + (item.productModel?.sellingPrice || 0), 0);
+            const vatAmount = subtotal * 0.07;
+            const total = subtotal + vatAmount;
+
+            const newSale = await tx.sale.create({
+                data: {
+                    customerId: parsedCustomerId,
+                    soldById,
+                    subtotal,
+                    vatAmount,
+                    total,
+                    notes,
+                    saleDate: new Date(saleDate), // ใช้ saleDate ที่ส่งมา
+                    createdAt: new Date(saleDate) // ตั้งค่า createdAt เป็นวันที่ขายด้วย
+                },
+            });
+
+            await tx.inventoryItem.updateMany({
+                where: { id: { in: inventoryItemIds } },
+                data: { status: 'SOLD', saleId: newSale.id },
+            });
+            
+            const customer = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
+
+            for (const itemId of inventoryItemIds) {
+                await createEventLog(
+                    tx,
+                    itemId,
+                    soldById,
+                    EventType.SALE,
+                    { 
+                        customerName: customer.name,
+                        saleId: newSale.id,
+                        details: `Item sold to ${customer.name} (Historical Entry).`
+                    }
+                );
+            }
+
+            return newSale;
+        });
+
+        res.status(201).json(sale);
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+
 module.exports = saleController;

@@ -12,15 +12,18 @@ import { toast } from "sonner";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { ArrowLeft, PackagePlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Textarea } from "@/components/ui/textarea"; // --- 1. Import Textarea ---
+import { Textarea } from "@/components/ui/textarea"; 
+import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
+
 
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
   if (cleaned.length === 0) return '';
-  return cleaned.match(/.{1,2}/g).slice(0, 6).join(':');
+  return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || '';
 };
 
 const validateMacAddress = (mac) => {
+  if (!mac) return true; // Optional field can be empty
   const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
   return macRegex.test(mac);
 };
@@ -30,7 +33,8 @@ const initialFormData = {
     serialNumber: "",
     macAddress: "",
     productModelId: "",
-    notes: "", // --- 2. เพิ่ม state สำหรับ notes ---
+    supplierId: "",
+    notes: "",
 };
 
 export default function CreateAssetPage() {
@@ -75,12 +79,10 @@ export default function CreateAssetPage() {
             return;
         }
 
-        // 2. ตรวจสอบว่าบังคับกรอกหรือไม่: ซึ่งจะทำก็ต่อเมื่อช่องนั้นว่าง
         if (isMacRequired && !formData.macAddress) {
             toast.error("MAC Address is required for this product category.");
             return;
         }
-        // --- END ---
 
         if (!formData.productModelId) {
             toast.error(t('error_select_model'));
@@ -91,8 +93,13 @@ export default function CreateAssetPage() {
             return;
         }
         
+        const payload = {
+            ...formData,
+            macAddress: formData.macAddress ? formData.macAddress.replace(/[:-\s]/g, '') : null,
+        };
+
         try {
-            await axiosInstance.post("/assets", formData, { 
+            await axiosInstance.post("/assets", payload, { 
                 headers: { Authorization: `Bearer ${token}` } 
             });
             toast.success(`Asset has been added to the warehouse successfully!`);
@@ -118,9 +125,15 @@ export default function CreateAssetPage() {
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                             <Label>{t('product_model_label')} <span className="text-red-500">{t('required_field')}</span></Label>
-                             <ProductModelCombobox onSelect={handleModelSelect} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>{t('product_model_label')} <span className="text-red-500">{t('required_field')}</span></Label>
+                                <ProductModelCombobox onSelect={handleModelSelect} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{t('supplier_label')}</Label>
+                                <SupplierCombobox onSelect={(id) => setFormData(prev => ({ ...prev, supplierId: id }))} />
+                            </div>
                         </div>
                         {selectedModelInfo && (
                             <div className="grid grid-cols-2 gap-4">
@@ -133,22 +146,20 @@ export default function CreateAssetPage() {
                             <Input id="assetCode" value={formData.assetCode} onChange={handleInputChange} required />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="serialNumber">{t('serial_number_label')} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">{t('not_required_label')}</span>}</Label>
-                            <Input id="serialNumber" value={formData.serialNumber || ''} onChange={handleInputChange} required={isSerialRequired} disabled={!isSerialRequired} />
+                            <Label htmlFor="serialNumber">{t('serial_number_label')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
+                            <Input id="serialNumber" value={formData.serialNumber || ''} onChange={handleInputChange} required={isSerialRequired} />
                         </div>
                         <div className="space-y-2">
-                             <Label htmlFor="macAddress">{t('mac_address_label')} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">{t('not_required_label')}</span>}</Label>
+                             <Label htmlFor="macAddress">{t('mac_address_label')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
                              <Input 
                                 id="macAddress" 
                                 value={formData.macAddress} 
                                 onChange={handleMacAddressChange} 
                                 required={isMacRequired} 
-                                disabled={!isMacRequired}
                                 maxLength={17}
                                 placeholder={t('mac_address_placeholder')}
                              />
                         </div>
-                        {/* --- 3. เพิ่ม Textarea สำหรับ Notes --- */}
                         <div className="space-y-2">
                             <Label htmlFor="notes">{t('notes')}</Label>
                             <Textarea
@@ -168,3 +179,4 @@ export default function CreateAssetPage() {
         </div>
     );
 }
+

@@ -15,6 +15,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTranslation } from "react-i18next";
 
+// --- START: เพิ่มฟังก์ชันสำหรับจัดรูปแบบ MAC Address ---
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || 'N/A';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+// --- END ---
+
 const PrintableHeaderCard = ({ profile, sale, formattedSaleId, t }) => (
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
@@ -75,7 +84,7 @@ const PrintableItemsCard = ({ sale, t }) => (
                                 <td className="p-2">{item.productModel.brand.name}</td>
                                 <td className="p-2">{item.productModel.modelNumber}</td>
                                 <td className="p-2">{item.serialNumber || 'N/A'}</td>
-                                <td className="p-2">{item.macAddress || 'N/A'}</td>
+                                <td className="p-2">{displayFormattedMac(item.macAddress)}</td>
                                 <td className="p-2 text-right">{item.productModel.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             </tr>
                         ))}
@@ -263,7 +272,7 @@ export default function SaleDetailPage() {
                                                 <td className="p-2">{item.productModel.brand.name}</td>
                                                 <td className="p-2">{item.productModel.modelNumber}</td>
                                                 <td className="p-2">{item.serialNumber || 'N/A'}</td>
-                                                <td className="p-2">{item.macAddress || 'N/A'}</td>
+                                                <td className="p-2">{displayFormattedMac(item.macAddress)}</td>
                                                 <td className="p-2 text-right">{item.productModel.sellingPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                             </tr>
                                         ))}

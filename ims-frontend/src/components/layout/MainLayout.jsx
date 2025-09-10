@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     LogOut, Menu, User, ArrowRightLeft, Building2, 
     ShoppingCart, Settings, Package, Boxes, Tag, Users as UsersIcon, 
-    HardDrive, Wrench, BookUser, Truck, Building, BarChart2
+    HardDrive, Wrench, BookUser, Truck, Building, BarChart2, BookUp
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -176,6 +176,7 @@ const MainLayout = () => {
                             {isSidebarCollapsed ? t('system').charAt(0) : t('system')}
                         </p>
                         <div className="space-y-1">
+                            <NavItem to="/historical-entry" icon={<BookUp size={18}/>} text={t('historical_menu_item')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />                            
                             <NavItem to="/users" icon={<Settings size={18}/>} text={t('userManagement')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                             <NavItem to="/company-profile" icon={<Building size={18}/>} text={t('company_profile')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         </div>

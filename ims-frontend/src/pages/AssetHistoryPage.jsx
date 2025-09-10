@@ -30,6 +30,13 @@ const eventConfig = {
     REPAIR_FAILED: { icon: <ShieldAlert className="h-4 w-4" /> },
 };
 
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || 'N/A';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+
 export default function AssetHistoryPage() {
     const { assetId } = useParams();
     const navigate = useNavigate();
@@ -136,7 +143,7 @@ export default function AssetHistoryPage() {
                             </div>
                             <div>
                                 <p className="text-muted-foreground">{t('tableHeader_macAddress')}</p>
-                                <p className="font-semibold text-foreground">{asset.macAddress || 'N/A'}</p>
+                                <p className="font-semibold text-foreground">{displayFormattedMac(asset.macAddress)}</p>
                             </div>
                             {asset.supplier && (
                                 <div>
@@ -145,14 +152,12 @@ export default function AssetHistoryPage() {
                                 </div>
                             )}
                         </div>
-                        {/* --- START: เพิ่มส่วนแสดง Notes --- */}
                         {asset.notes && (
                             <div className="mt-6">
                                 <h4 className="font-semibold">{t('notes')}</h4>
                                 <p className="whitespace-pre-wrap text-sm text-muted-foreground border p-3 rounded-md bg-muted/30">{asset.notes}</p>
                             </div>
                         )}
-                        {/* --- END --- */}
                     </CardContent>
                 </Card>
 

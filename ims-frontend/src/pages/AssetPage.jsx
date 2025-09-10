@@ -30,6 +30,13 @@ import {
 import { useTranslation } from "react-i18next";
 import EditAssetDialog from "@/components/dialogs/EditAssetDialog";
 
+const displayFormattedMac = (mac) => {
+    if (!mac || mac.length !== 12) {
+        return mac || '-';
+    }
+    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+
 const SkeletonRow = () => (
     <TableRow>
         <TableCell colSpan="9"><div className="h-5 bg-gray-200 rounded animate-pulse"></div></TableCell>
@@ -204,8 +211,8 @@ export default function AssetPage() {
                                     <TableCell>{asset.productModel.category.name}</TableCell>
                                     <TableCell>{asset.productModel.brand.name}</TableCell>
                                     <TableCell>{asset.productModel?.modelNumber || 'N/A'}</TableCell>
-                                    <TableCell>{asset.serialNumber || 'N/A'}</TableCell>
-                                    <TableCell>{asset.macAddress || 'N/A'}</TableCell>
+                                    <TableCell>{asset.serialNumber || '-'}</TableCell>
+                                    <TableCell>{displayFormattedMac(asset.macAddress)}</TableCell>
                                     <TableCell className="text-center">
                                         <StatusBadge
                                             status={asset.status}
@@ -348,3 +355,4 @@ export default function AssetPage() {
         </Card>
     );
 }
+

@@ -8,14 +8,16 @@ const { roleCheck } = require('../middlewares/roleCheckMiddleware.js');
 const inventoryController = require('../controllers/inventoryController.js');
 
 const adminAccess = ['ADMIN', 'SUPER_ADMIN'];
+const superAdminAccess = ['SUPER_ADMIN'];
 
 // Routes for inventory items (for SALE)
 router.get('/', authCheck, inventoryController.getAllInventoryItems);
 router.get('/:id', authCheck, inventoryController.getInventoryItemById);
 
-// --- START: เพิ่ม Route ใหม่สำหรับ Batch Create ---
+
 router.post('/batch', authCheck, roleCheck(adminAccess), inventoryController.addBatchInventoryItems);
-// --- END ---
+router.post('/historical', authCheck, roleCheck(superAdminAccess), inventoryController.addHistoricalInventory);
+
 
 router.post('/', authCheck, roleCheck(adminAccess), inventoryController.addInventoryItem);
 router.put('/:id', authCheck, roleCheck(adminAccess), inventoryController.updateInventoryItem);

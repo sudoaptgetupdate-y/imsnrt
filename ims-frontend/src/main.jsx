@@ -49,6 +49,10 @@ const RepairDetailPage = lazy(() => import('./pages/RepairDetailPage.jsx'));
 const SupplierPage = lazy(() => import('./pages/SupplierPage.jsx'));
 const CompanyProfilePage = lazy(() => import('./pages/CompanyProfilePage.jsx'));
 const SalesReportPage = lazy(() => import('./pages/SalesReportPage.jsx'));
+// --- START: เพิ่มการ Import หน้าใหม่ ---
+const HistoricalDataEntryPage = lazy(() => import('./pages/HistoricalDataEntryPage.jsx'));
+// --- END ---
+
 
 // Fallback component to show while lazy components are loading
 const Loading = () => (
@@ -95,6 +99,9 @@ const adminRoutes = [
     { path: 'users/:userId/assets', Page: UserAssetHistoryPage },
     { path: 'users/:userId/active-assets', Page: UserActiveAssetsPage },
     { path: 'company-profile', Page: CompanyProfilePage },
+    // --- START: เพิ่ม Route สำหรับหน้าใหม่ ---
+    { path: 'historical-entry', Page: HistoricalDataEntryPage },
+    // --- END ---
 ];
 
 const router = createBrowserRouter([
