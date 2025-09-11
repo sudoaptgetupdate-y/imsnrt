@@ -1,6 +1,6 @@
 // src/pages/HistoricalDataEntryPage.jsx
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
@@ -20,6 +20,7 @@ const HistoricalDataEntryPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const token = useAuthStore((state) => state.token);
+    const serialNumberInputRef = useRef(null); // Ref for focusing
 
     // Form States
     const [createdAt, setCreatedAt] = useState('');
@@ -30,6 +31,7 @@ const HistoricalDataEntryPage = () => {
         productModelId: null,
         productModel: null,
         supplierId: null,
+        supplier: null,
         serialNumber: '',
         macAddress: '',
         isSerialRequired: false,
@@ -64,8 +66,8 @@ const HistoricalDataEntryPage = () => {
                 productModelId: model.id,
                 isSerialRequired: model.category.requiresSerialNumber,
                 isMacRequired: model.category.requiresMacAddress,
-                serialNumber: model.category.requiresSerialNumber ? prev.serialNumber : '',
-                macAddress: model.category.requiresMacAddress ? prev.macAddress : ''
+                serialNumber: prev.serialNumber, // Keep existing SN input
+                macAddress: prev.macAddress,     // Keep existing MAC input
             }));
         } else {
             setCurrentItem(prev => ({
@@ -79,17 +81,25 @@ const HistoricalDataEntryPage = () => {
             }));
         }
     };
+    
+    const handleSupplierSelect = (supplier) => {
+        if (supplier) {
+            setCurrentItem(prev => ({...prev, supplierId: supplier.id, supplier: supplier }));
+        } else {
+            setCurrentItem(prev => ({...prev, supplierId: null, supplier: null }));
+        }
+    };
 
     const handleAddItem = () => {
         if (!currentItem.productModel || !currentItem.supplierId) {
             toast.error(t('error_select_model_and_supplier'));
             return;
         }
-        if (currentItem.isSerialRequired && !currentItem.serialNumber) {
+        if (currentItem.isSerialRequired && !currentItem.serialNumber.trim()) {
             toast.error(t('error_serial_required_category'));
             return;
         }
-        if (currentItem.isMacRequired && !currentItem.macAddress) {
+        if (currentItem.isMacRequired && !currentItem.macAddress.trim()) {
             toast.error(t('error_mac_required_category'));
             return;
         }
@@ -98,16 +108,34 @@ const HistoricalDataEntryPage = () => {
             return;
         }
 
+        // Duplicate Check within the form list
+        if (currentItem.serialNumber.trim()) {
+            const isSerialDuplicate = items.some(item => item.serialNumber.trim() === currentItem.serialNumber.trim());
+            if (isSerialDuplicate) {
+                toast.error(t('error_historical_duplicate_serial', { serial: currentItem.serialNumber }));
+                return;
+            }
+        }
+        if (currentItem.macAddress.trim()) {
+            const cleanNewMac = currentItem.macAddress.replace(/[:-\s]/g, '');
+            const isMacDuplicate = items.some(item => item.macAddress && item.macAddress.replace(/[:-\s]/g, '') === cleanNewMac);
+            if (isMacDuplicate) {
+                toast.error(t('error_historical_duplicate_mac', { mac: currentItem.macAddress }));
+                return;
+            }
+        }
+
         setItems([...items, { ...currentItem, id: Date.now() }]);
-        setCurrentItem({
-            productModelId: null,
-            productModel: null,
-            supplierId: null,
+        
+        // Reset only serial and mac for next entry, keep the rest
+        setCurrentItem(prev => ({
+            ...prev,
             serialNumber: '',
             macAddress: '',
-            isSerialRequired: false,
-            isMacRequired: false
-        });
+        }));
+
+        // Focus on the serial number input for the next item
+        serialNumberInputRef.current?.focus();
     };
     
     const handleRemoveItem = (id) => {
@@ -121,7 +149,7 @@ const HistoricalDataEntryPage = () => {
         }
 
         for (const item of items) {
-            if (item.isMacRequired && !item.macAddress) {
+             if (item.isMacRequired && !item.macAddress) {
                  toast.error(t('error_mac_required_for_item', { model: item.productModel?.modelNumber, sn: item.serialNumber }));
                 return;
             }
@@ -199,13 +227,17 @@ const HistoricalDataEntryPage = () => {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div className="space-y-2">
                             <Label>{t('product_model_label')} *</Label>
-                            <ProductModelCombobox onSelect={handleModelSelect} />
+                            <ProductModelCombobox 
+                                onSelect={handleModelSelect}
+                                initialModel={currentItem.productModel}
+                            />
                          </div>
                          <div className="space-y-2">
                             <Label>{t('supplier_label')} *</Label>
                             <SupplierCombobox 
                                 selectedValue={currentItem.supplierId} 
-                                onSelect={(id) => setCurrentItem(prev => ({...prev, supplierId: id}))} 
+                                onSelect={handleSupplierSelect}
+                                initialSupplier={currentItem.supplier}
                             />
                          </div>
                      </div>
@@ -217,6 +249,7 @@ const HistoricalDataEntryPage = () => {
                                 {!currentItem.isSerialRequired && currentItem.productModel && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}
                             </Label>
                             <Input 
+                                ref={serialNumberInputRef}
                                 id="serialNumber" 
                                 value={currentItem.serialNumber} 
                                 onChange={e => setCurrentItem(prev => ({...prev, serialNumber: e.target.value.toUpperCase()}))} 

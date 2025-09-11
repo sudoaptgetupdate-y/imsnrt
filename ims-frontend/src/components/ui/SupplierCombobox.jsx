@@ -48,6 +48,8 @@ export function SupplierCombobox({ selectedValue, onSelect, initialSupplier }) {
       if(!searchQuery){
         setSearchResults([initialSupplier]);
       }
+    } else {
+      setSelectedSupplierDisplay(null);
     }
   }, [initialSupplier]);
 
@@ -77,7 +79,7 @@ export function SupplierCombobox({ selectedValue, onSelect, initialSupplier }) {
   
   useEffect(() => {
     if (selectedValue) {
-        const supplier = searchResults.find(s => String(s.id) === selectedValue);
+        const supplier = searchResults.find(s => String(s.id) === String(selectedValue));
         if(supplier) {
             setSelectedSupplierDisplay(supplier);
         }
@@ -115,7 +117,7 @@ export function SupplierCombobox({ selectedValue, onSelect, initialSupplier }) {
                   key={supplier.id}
                   value={String(supplier.id)}
                   onSelect={() => {
-                     onSelect(String(supplier.id));
+                     onSelect(supplier); // --- Change: Return the whole object ---
                      setSelectedSupplierDisplay(supplier);
                      setOpen(false);
                   }}
@@ -123,7 +125,7 @@ export function SupplierCombobox({ selectedValue, onSelect, initialSupplier }) {
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedValue === String(supplier.id) ? "opacity-100" : "opacity-0"
+                      String(selectedValue) === String(supplier.id) ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {supplier.name}
