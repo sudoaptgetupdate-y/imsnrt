@@ -15,16 +15,17 @@ import { CustomerCombobox } from "@/components/ui/CustomerCombobox";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
 import { Trash2, BookUp } from "lucide-react";
+// --- 1. Import คอมโพเนนต์ที่ถูกต้อง ---
+import { DatePickerWithCustomCaption } from "@/components/ui/DatePickerWithCustomCaption";
 
 const HistoricalDataEntryPage = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const token = useAuthStore((state) => state.token);
-    const serialNumberInputRef = useRef(null); // Ref for focusing
+    const serialNumberInputRef = useRef(null);
 
-    // Form States
-    const [createdAt, setCreatedAt] = useState('');
-    const [saleDate, setSaleDate] = useState('');
+    const [createdAt, setCreatedAt] = useState(null);
+    const [saleDate, setSaleDate] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState("");
     const [items, setItems] = useState([]);
     const [currentItem, setCurrentItem] = useState({
@@ -38,18 +39,16 @@ const HistoricalDataEntryPage = () => {
         isMacRequired: false,
     });
 
-    // Helper function to format MAC address
     const formatMacAddress = (value) => {
         const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
         if (cleaned.length === 0) return '';
         return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || '';
     };
 
-    // Helper function to validate MAC address
     const isValidMacAddress = (mac) => {
-        if (!mac) return true; // MAC is optional, so empty/null is valid
-        const cleanMac = mac.replace(/[:-\s]/g, ''); // Remove separators for validation
-        return /^[0-9a-fA-F]{12}$/.test(cleanMac); // Must be 12 hex characters
+        if (!mac) return true;
+        const cleanMac = mac.replace(/[:-\s]/g, '');
+        return /^[0-9a-fA-F]{12}$/.test(cleanMac);
     };
 
     const handleMacAddressChange = (e) => {
@@ -57,7 +56,7 @@ const HistoricalDataEntryPage = () => {
         const formatted = formatMacAddress(input);
         setCurrentItem(prev => ({...prev, macAddress: formatted}));
     };
-
+    
     const handleModelSelect = (model) => {
         if (model) {
             setCurrentItem(prev => ({
@@ -66,8 +65,8 @@ const HistoricalDataEntryPage = () => {
                 productModelId: model.id,
                 isSerialRequired: model.category.requiresSerialNumber,
                 isMacRequired: model.category.requiresMacAddress,
-                serialNumber: prev.serialNumber, // Keep existing SN input
-                macAddress: prev.macAddress,     // Keep existing MAC input
+                serialNumber: prev.serialNumber,
+                macAddress: prev.macAddress,
             }));
         } else {
             setCurrentItem(prev => ({
@@ -108,7 +107,6 @@ const HistoricalDataEntryPage = () => {
             return;
         }
 
-        // Duplicate Check within the form list
         if (currentItem.serialNumber.trim()) {
             const isSerialDuplicate = items.some(item => item.serialNumber.trim() === currentItem.serialNumber.trim());
             if (isSerialDuplicate) {
@@ -127,14 +125,12 @@ const HistoricalDataEntryPage = () => {
 
         setItems([...items, { ...currentItem, id: Date.now() }]);
         
-        // Reset only serial and mac for next entry, keep the rest
         setCurrentItem(prev => ({
             ...prev,
             serialNumber: '',
             macAddress: '',
         }));
 
-        // Focus on the serial number input for the next item
         serialNumberInputRef.current?.focus();
     };
     
@@ -161,7 +157,7 @@ const HistoricalDataEntryPage = () => {
 
         try {
             const inventoryPayload = {
-                createdAt,
+                createdAt: createdAt.toISOString(),
                 items: items.map(item => ({
                     productModelId: item.productModelId,
                     supplierId: item.supplierId,
@@ -177,7 +173,7 @@ const HistoricalDataEntryPage = () => {
             const salePayload = {
                 customerId: selectedCustomerId,
                 inventoryItemIds: newItemIds,
-                saleDate,
+                saleDate: saleDate.toISOString(),
                 notes: `Historical data entry for ${items.length} item(s).`
             };
              await axiosInstance.post('/sales/historical', salePayload, {
@@ -208,11 +204,11 @@ const HistoricalDataEntryPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="createdAt">{t('historical_item_creation_date')} *</Label>
-                        <Input id="createdAt" type="date" value={createdAt} onChange={e => setCreatedAt(e.target.value)} />
+                        <DatePickerWithCustomCaption value={createdAt} onChange={setCreatedAt} />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="saleDate">{t('historical_sale_date')} *</Label>
-                        <Input id="saleDate" type="date" value={saleDate} onChange={e => setSaleDate(e.target.value)} />
+                        <DatePickerWithCustomCaption value={saleDate} onChange={setSaleDate} />
                     </div>
                     <div className="space-y-2">
                         <Label>{t('customer_label')} *</Label>
@@ -304,4 +300,3 @@ const HistoricalDataEntryPage = () => {
 };
 
 export default HistoricalDataEntryPage;
-

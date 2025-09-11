@@ -171,3 +171,46 @@
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
   background-color: #9ca3af;
 }
+
+/* --- START: เพิ่มโค้ดส่วนนี้เพื่อแก้ไขปฏิทิน --- */
+.rdp-caption_dropdowns {
+  display: flex;
+  gap: 0.5rem; /* 8px */
+  align-items: center;
+}
+
+.rdp-vhidden {
+  display: none;
+}
+
+.rdp-dropdown {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-left: 0.75rem; /* 12px */
+  padding-right: 2rem; /* 32px */
+  height: 2.25rem; /* 36px */
+  border-radius: 0.375rem; /* 6px */
+  border: 1px solid hsl(var(--input));
+  background-color: hsl(var(--background));
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem; /* 20px */
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23333' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1em 1em;
+}
+
+.rdp-dropdown_month {
+  min-width: 120px;
+}
+
+.rdp-dropdown_year {
+  min-width: 90px;
+}
+
+.rdp-nav {
+    display: none !important; /* ซ่อนปุ่มลูกศรซ้าย-ขวาแบบเก่า */
+}
+/* --- END: จบส่วนที่ต้องเพิ่ม --- */
