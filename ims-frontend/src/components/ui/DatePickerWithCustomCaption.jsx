@@ -29,9 +29,9 @@ const formatToBuddhistYear = (date, fmt) => {
   return format(date, formatString, { locale: th });
 };
 
+// This component remains mostly the same, but the key fix is inside the Year <SelectTrigger>
 function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale }) {
-  const { i18n } = useTranslation();
-  const isThai = i18n.language === 'th';
+  const isThai = locale?.code === 'th';
 
   const years = Array.from({ length: (toYear || 0) - (fromYear || 0) + 1 }, (_, i) => (fromYear || 0) + i).reverse();
   
@@ -70,9 +70,10 @@ function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale }
         }}
       >
         <SelectTrigger className="w-[100px]">
-          <SelectValue>
+           {/* This is the corrected part. It now explicitly displays the correct year format. */}
+          <span className="truncate">
             {isThai ? displayMonth.getFullYear() + 543 : displayMonth.getFullYear()}
-          </SelectValue>
+          </span>
         </SelectTrigger>
         <SelectContent>
           {years.map((year) => (
@@ -88,7 +89,7 @@ function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale }
 
 export function DatePickerWithCustomCaption({ value, onChange }) {
   const { i18n } = useTranslation();
-  const isThai = i18n.language === 'th';
+  const isThai = i18n.language.startsWith('th');
   
   const [date, setDate] = React.useState(value ? new Date(value) : null);
   const [popoverOpen, setPopoverOpen] = React.useState(false);
@@ -139,15 +140,15 @@ export function DatePickerWithCustomCaption({ value, onChange }) {
           locale={isThai ? th : undefined}
           fromYear={fromYear}
           toYear={toYear}
-          captionLayout="dropdown" // ใช้ dropdown layout
+          captionLayout="dropdown"
           components={{
             Caption: (props) => (
               <CustomCaption {...props} fromYear={fromYear} toYear={toYear} locale={isThai ? th : undefined} />
             )
           }}
           classNames={{
-            caption_label: "hidden", // ซ่อน label เดิม
-            nav_button: "h-6 w-6" // ปรับขนาดปุ่ม next/prev
+            caption_label: "hidden",
+            nav_button: "h-6 w-6"
           }}
         />
       </PopoverContent>
