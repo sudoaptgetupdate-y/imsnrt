@@ -4,9 +4,19 @@ const prisma = require('../prisma/client');
 const { EventType } = require('@prisma/client');
 const saleController = {};
 
-const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
+// --- START: MODIFIED ---
+const createEventLog = (tx, inventoryItemId, userId, eventType, details, timestamp = new Date()) => {
+// --- END: MODIFIED ---
     return tx.eventLog.create({
-        data: { inventoryItemId, userId, eventType, details },
+        data: { 
+            inventoryItemId, 
+            userId, 
+            eventType, 
+            details,
+            // --- START: ADDED ---
+            createdAt: timestamp
+            // --- END: ADDED ---
+        },
     });
 };
 
@@ -100,6 +110,8 @@ saleController.createSale = async (req, res, next) => {
         next(error);
     }
 };
+
+// ... (โค้ดส่วน getAllSales และ getSaleById) ...
 
 saleController.getAllSales = async (req, res, next) => {
     try {
@@ -334,6 +346,7 @@ saleController.createHistoricalSale = async (req, res, next) => {
             const customer = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
 
             for (const itemId of inventoryItemIds) {
+                // --- START: MODIFIED ---
                 await createEventLog(
                     tx,
                     itemId,
@@ -343,8 +356,10 @@ saleController.createHistoricalSale = async (req, res, next) => {
                         customerName: customer.name,
                         saleId: newSale.id,
                         details: `Item sold to ${customer.name} (Historical Entry).`
-                    }
+                    },
+                    new Date(saleDate) // Pass the historical date here
                 );
+                // --- END: MODIFIED ---
             }
 
             return newSale;

@@ -5,13 +5,18 @@ const inventoryController = {};
 const macRegex = /^[0-9A-Fa-f]{12}$/; // Regex for MAC address without separators
 
 // Helper function to create event logs consistently
-const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
+// --- START: MODIFIED ---
+const createEventLog = (tx, inventoryItemId, userId, eventType, details, timestamp = new Date()) => {
+// --- END: MODIFIED ---
     return tx.eventLog.create({
         data: {
             inventoryItemId,
             userId,
             eventType,
             details,
+            // --- START: ADDED ---
+            createdAt: timestamp,
+            // --- END: ADDED ---
         },
     });
 };
@@ -239,13 +244,16 @@ inventoryController.addHistoricalInventory = async (req, res, next) => {
                     },
                 });
 
+                // --- START: MODIFIED ---
                 await createEventLog(
                     tx,
                     createdItem.id,
                     userId,
                     EventType.CREATE,
-                    { details: `Item created via historical entry with S/N: ${createdItem.serialNumber || 'N/A'}.` }
+                    { details: `Item created via historical entry with S/N: ${createdItem.serialNumber || 'N/A'}.` },
+                    new Date(createdAt) // Pass the historical date here
                 );
+                // --- END: MODIFIED ---
                 
                 createdItems.push(createdItem);
             }
