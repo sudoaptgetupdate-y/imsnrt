@@ -31,6 +31,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslation } from "react-i18next";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
+
 
 // --- START: เพิ่มฟังก์ชันสำหรับจัดรูปแบบ MAC Address ---
 const displayFormattedMac = (mac) => {
@@ -38,6 +43,24 @@ const displayFormattedMac = (mac) => {
         return mac || 'N/A';
     }
     return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
+};
+// --- END ---
+
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
 };
 // --- END ---
 
@@ -151,7 +174,9 @@ const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) =
     );
 };
 
-const PrintableHeaderCard = ({ borrowing, formattedBorrowingId, t, profile }) => (
+// --- START: 3. อัปเดต Props ของ PrintableHeaderCard ให้รับวันที่ที่จัดรูปแบบแล้ว ---
+const PrintableHeaderCard = ({ borrowing, formattedBorrowingId, t, profile, formattedBorrowDate, formattedDueDate }) => (
+// --- END ---
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
             <h1 className="text-lg font-bold">{profile.name}</h1>
@@ -164,34 +189,38 @@ const PrintableHeaderCard = ({ borrowing, formattedBorrowingId, t, profile }) =>
         </CardContent>
         <CardContent className="p-4">
              <div className="grid grid-cols-2 gap-6 text-xs">
-                <div className="space-y-1">
-                    <p className="text-slate-600">{t('borrower')}</p>
-                    <p className="font-semibold">{borrowing.customer?.name || 'N/A'}</p>
-                    <p className="text-slate-600">{borrowing.customer?.address || "No address provided"}</p>
-                    <p className="text-slate-600">{t('phone')}. {borrowing.customer?.phone || 'N/A'}</p>
-                </div>
-                <div className="space-y-1 text-right">
-                    <p className="text-slate-600">{t('record_id')}</p>
-                    <p className="font-semibold">#{formattedBorrowingId}</p>
-                    <p className="text-slate-600">{t('borrow_date')}</p>
-                    <p className="font-semibold">{new Date(borrowing.borrowDate).toLocaleString('th-TH')}</p>
-                    <p className="text-slate-600">{t('due_date')}</p>
-                    <p className="font-semibold">{borrowing.dueDate ? new Date(borrowing.dueDate).toLocaleDateString('th-TH') : 'N/A'}</p>
-                    <p className="text-slate-600">{t('approved_by')}</p>
-                    <p className="font-semibold">{borrowing.approvedBy?.name || 'N/A'}</p>
-                </div>
-            </div>
-            {borrowing.notes && (
-                <div className="mt-4">
-                    <p className="font-semibold text-xs">{t('printable_notes')}</p>
-                    <p className="whitespace-pre-wrap text-xs text-slate-700 border p-2 rounded-md bg-slate-50">{borrowing.notes}</p>
-                </div>
-            )}
+                 <div className="space-y-1">
+                     <p className="text-slate-600">{t('borrower')}</p>
+                     <p className="font-semibold">{borrowing.customer?.name || 'N/A'}</p>
+                     <p className="text-slate-600">{borrowing.customer?.address || "No address provided"}</p>
+                     <p className="text-slate-600">{t('phone')}. {borrowing.customer?.phone || 'N/A'}</p>
+                 </div>
+                 <div className="space-y-1 text-right">
+                     <p className="text-slate-600">{t('record_id')}</p>
+                     <p className="font-semibold">#{formattedBorrowingId}</p>
+                     <p className="text-slate-600">{t('borrow_date')}</p>
+                     {/* --- START: 4. ใช้ Props วันที่ที่จัดรูปแบบแล้ว (สำหรับพิมพ์) --- */}
+                     <p className="font-semibold">{formattedBorrowDate}</p>
+                     <p className="text-slate-600">{t('due_date')}</p>
+                     <p className="font-semibold">{formattedDueDate}</p>
+                     {/* --- END --- */}
+                     <p className="text-slate-600">{t('approved_by')}</p>
+                     <p className="font-semibold">{borrowing.approvedBy?.name || 'N/A'}</p>
+                 </div>
+             </div>
+             {borrowing.notes && (
+                 <div className="mt-4">
+                     <p className="font-semibold text-xs">{t('printable_notes')}</p>
+                     <p className="whitespace-pre-wrap text-xs text-slate-700 border p-2 rounded-md bg-slate-50">{borrowing.notes}</p>
+                 </div>
+             )}
         </CardContent>
     </Card>
 );
 
-const PrintableItemsCard = ({ borrowing, t }) => (
+// --- START: 5. อัปเดต Props ของ PrintableItemsCard ให้รับภาษา (language) ---
+const PrintableItemsCard = ({ borrowing, t, language }) => (
+// --- END ---
     <Card className="hidden print:block mt-0 font-sarabun border-black rounded-t-none">
         <CardHeader className="p-2 border-t border-black">
             <CardTitle className="text-sm">{t('printable_items_borrowed', { count: borrowing.items.length })}</CardTitle>
@@ -216,11 +245,11 @@ const PrintableItemsCard = ({ borrowing, t }) => (
                                 <td className="p-2">{boi.inventoryItem?.productModel?.brand?.name || 'N/A'}</td>
                                 <td className="p-2">{boi.inventoryItem?.productModel?.modelNumber || 'N/A'}</td>
                                 <td className="p-2">{boi.inventoryItem?.serialNumber || 'N/A'}</td>
-                                {/* --- START: แก้ไขการแสดงผล MAC Address --- */}
                                 <td className="p-2">{displayFormattedMac(boi.inventoryItem?.macAddress)}</td>
-                                {/* --- END --- */}
                                 <td className="p-2">
-                                    {boi.returnedAt ? `${t('status_returned')} (${new Date(boi.returnedAt).toLocaleDateString('th-TH')})` : t('status_borrowed')}
+                                    {/* --- START: 6. ใช้วันที่ที่จัดรูปแบบแล้ว (ในตารางพิมพ์) --- */}
+                                    {boi.returnedAt ? `${t('status_returned')} (${formatDateByLocale(boi.returnedAt, language)})` : t('status_borrowed')}
+                                    {/* --- END --- */}
                                 </td>
                             </tr>
                         ))}
@@ -235,7 +264,9 @@ const PrintableItemsCard = ({ borrowing, t }) => (
 export default function BorrowingDetailPage() {
     const { borrowingId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: 7. ดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const { user: currentUser } = useAuthStore((state) => state);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
@@ -294,6 +325,11 @@ export default function BorrowingDetailPage() {
     const itemsToReturn = borrowing.items.filter(item => !item.returnedAt && item.inventoryItem);
     const formattedBorrowingId = borrowing.id.toString().padStart(6, '0');
     
+    // --- START: 8. สร้างตัวแปรวันที่ที่จัดรูปแบบแล้ว ---
+    const formattedBorrowDate = formatDateByLocale(borrowing.borrowDate, i18n.language);
+    const formattedDueDate = formatDateByLocale(borrowing.dueDate, i18n.language);
+    // --- END ---
+
     return (
         <div>
             <div className="no-print space-y-6">
@@ -324,81 +360,84 @@ export default function BorrowingDetailPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                      <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
+                         <CardHeader>
+                             <div className="flex justify-between items-start">
                                  <div>
-                                    <CardTitle>{t('borrowing_details_card_title')}</CardTitle>
-                                    <CardDescription>{t('record_id')} #{formattedBorrowingId}</CardDescription>
-                                </div>
+                                     <CardTitle>{t('borrowing_details_card_title')}</CardTitle>
+                                     <CardDescription>{t('record_id')} #{formattedBorrowingId}</CardDescription>
+                                 </div>
                                  <StatusBadge status={borrowing.status} className="w-28 text-base"/>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">{t('borrower')}</p>
-                                    <p>{borrowing.customer.name}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">{t('borrow_date')}</p>
-                                    <p>{new Date(borrowing.borrowDate).toLocaleString()}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">{t('approved_by')}</p>
-                                    <p>{borrowing.approvedBy?.name || 'N/A'}</p>
-                                </div>
-                            </div>
-                            {borrowing.notes && (
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">{t('notes')}</p>
-                                    <p className="whitespace-pre-wrap text-sm border p-3 rounded-md bg-muted/30">{borrowing.notes}</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                             </div>
+                         </CardHeader>
+                         <CardContent className="space-y-4">
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                 <div className="space-y-1">
+                                     <p className="text-sm font-medium text-muted-foreground">{t('borrower')}</p>
+                                     <p>{borrowing.customer.name}</p>
+                                 </div>
+                                 <div className="space-y-1">
+                                     <p className="text-sm font-medium text-muted-foreground">{t('borrow_date')}</p>
+                                     {/* --- START: 9. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ในหน้าเว็บ Card) --- */}
+                                     <p>{formattedBorrowDate}</p>
+                                     {/* (หมายเหตุ: โค้ดเดิมของคุณไม่มี Due Date ในการ์ดนี้ ผมจึงยึดตามนั้น) */}
+                                     {/* --- END --- */}
+                                 </div>
+                                 <div className="space-y-1">
+                                     <p className="text-sm font-medium text-muted-foreground">{t('approved_by')}</p>
+                                     <p>{borrowing.approvedBy?.name || 'N/A'}</p>
+                                 </div>
+                             </div>
+                             {borrowing.notes && (
+                                 <div className="space-y-1">
+                                     <p className="text-sm font-medium text-muted-foreground">{t('notes')}</p>
+                                     <p className="whitespace-pre-wrap text-sm border p-3 rounded-md bg-muted/30">{borrowing.notes}</p>
+                                 </div>
+                             )}
+                         </CardContent>
+                     </Card>
                     
-                    <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <CardTitle>{t('borrowed_items_title', { count: borrowing.items.length })}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="border rounded-lg overflow-x-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>{t('tableHeader_category')}</TableHead>
-                                            <TableHead>{t('tableHeader_brand')}</TableHead>
-                                            <TableHead>{t('tableHeader_productModel')}</TableHead>
-                                            <TableHead>{t('tableHeader_serialNumber')}</TableHead>
-                                            <TableHead>{t('tableHeader_macAddress')}</TableHead>
-                                            <TableHead>{t('tableHeader_status')}</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {borrowing.items.map(boi => (
-                                            <TableRow key={boi.inventoryItemId}>
-                                                <TableCell>{boi.inventoryItem?.productModel?.category?.name || 'N/A'}</TableCell>
-                                                <TableCell>{boi.inventoryItem?.productModel?.brand?.name || 'N/A'}</TableCell>
-                                                <TableCell>{boi.inventoryItem?.productModel?.modelNumber || 'N/A'}</TableCell>
-                                                <TableCell>{boi.inventoryItem?.serialNumber || 'N/A'}</TableCell>
-                                                {/* --- START: แก้ไขการแสดงผล MAC Address --- */}
-                                                <TableCell>{displayFormattedMac(boi.inventoryItem?.macAddress)}</TableCell>
-                                                {/* --- END --- */}
-                                                <TableCell>
-                                                    <StatusBadge status={boi.returnedAt ? 'RETURNED' : 'BORROWED'} />
-                                                    {boi.returnedAt && (
-                                                        <span className="text-xs text-muted-foreground ml-2">
-                                                            ({t('status_returned')} {new Date(boi.returnedAt).toLocaleDateString('th-TH')})
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                     <Card className="lg:col-span-3">
+                         <CardHeader>
+                             <CardTitle>{t('borrowed_items_title', { count: borrowing.items.length })}</CardTitle>
+                         </CardHeader>
+                         <CardContent>
+                             <div className="border rounded-lg overflow-x-auto">
+                                 <Table>
+                                     <TableHeader>
+                                         <TableRow>
+                                             <TableHead>{t('tableHeader_category')}</TableHead>
+                                             <TableHead>{t('tableHeader_brand')}</TableHead>
+                                             <TableHead>{t('tableHeader_productModel')}</TableHead>
+                                             <TableHead>{t('tableHeader_serialNumber')}</TableHead>
+                                             <TableHead>{t('tableHeader_macAddress')}</TableHead>
+                                             <TableHead>{t('tableHeader_status')}</TableHead>
+                                         </TableRow>
+                                     </TableHeader>
+                                     <TableBody>
+                                         {borrowing.items.map(boi => (
+                                             <TableRow key={boi.inventoryItemId}>
+                                                 <TableCell>{boi.inventoryItem?.productModel?.category?.name || 'N/A'}</TableCell>
+                                                 <TableCell>{boi.inventoryItem?.productModel?.brand?.name || 'N/A'}</TableCell>
+                                                 <TableCell>{boi.inventoryItem?.productModel?.modelNumber || 'N/A'}</TableCell>
+                                                 <TableCell>{boi.inventoryItem?.serialNumber || 'N/A'}</TableCell>
+                                                 <TableCell>{displayFormattedMac(boi.inventoryItem?.macAddress)}</TableCell>
+                                                 <TableCell>
+                                                     <StatusBadge status={boi.returnedAt ? 'RETURNED' : 'BORROWED'} />
+                                                     {boi.returnedAt && (
+                                                         <span className="text-xs text-muted-foreground ml-2">
+                                                            {/* --- START: 10. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ในหน้าเว็บ Table) --- */}
+                                                            ({t('status_returned')} {formatDateByLocale(boi.returnedAt, i18n.language)})
+                                                            {/* --- END --- */}
+                                                         </span>
+                                                     )}
+                                                 </TableCell>
+                                             </TableRow>
+                                         ))}
+                                     </TableBody>
+                                 </Table>
+                             </div>
+                         </CardContent>
+                     </Card>
                 </div>
 
                 <ReturnItemsDialog
@@ -410,8 +449,21 @@ export default function BorrowingDetailPage() {
             </div>
             
             <div className="hidden print:block printable-area font-sarabun">
-                <PrintableHeaderCard borrowing={borrowing} formattedBorrowingId={formattedBorrowingId} t={t} profile={companyProfile} />
-                <PrintableItemsCard borrowing={borrowing} t={t} />
+                {/* --- START: 11. ส่ง Props วันที่และภาษา ไปยัง Component สำหรับพิมพ์ --- */}
+                <PrintableHeaderCard 
+                    borrowing={borrowing} 
+                    formattedBorrowingId={formattedBorrowingId} 
+                    t={t} 
+                    profile={companyProfile} 
+                    formattedBorrowDate={formattedBorrowDate}
+                    formattedDueDate={formattedDueDate}
+                />
+                <PrintableItemsCard 
+                    borrowing={borrowing} 
+                    t={t} 
+                    language={i18n.language}
+                />
+                {/* --- END --- */}
 
                 <div className="signature-section">
                     <div className="signature-box">

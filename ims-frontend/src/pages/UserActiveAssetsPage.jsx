@@ -4,34 +4,57 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { ArrowLeft, Package } from "lucide-react";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { ArrowLeft, User, Package } from "lucide-react";
+import { useTranslation } from "react-i18next";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
+
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
 
 export default function UserActiveAssetsPage() {
     const { userId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation(); // --- 2. เรียกใช้ useTranslation ---
+    // --- START: 3. แก้ไข Hook เพื่อดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
-    const [assets, setAssets] = useState([]);
-    const [userName, setUserName] = useState('');
+    const [user, setUser] = useState(null);
+    const [activeAssets, setActiveAssets] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             if (!userId || !token) return;
             try {
-                setLoading(true);
                 const [assetsRes, userRes] = await Promise.all([
-                    axiosInstance.get(`/users/${userId}/active-assets`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axiosInstance.get(`/users/${userId}/assets/active`, { headers: { Authorization: `Bearer ${token}` } }),
                     axiosInstance.get(`/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
-                setAssets(assetsRes.data);
-                setUserName(userRes.data.name);
+                setActiveAssets(assetsRes.data);
+                setUser(userRes.data);
             } catch (error) {
-                toast.error("Failed to fetch active assets.");
+                toast.error("Failed to fetch user's active assets.");
             } finally {
                 setLoading(false);
             }
@@ -43,23 +66,24 @@ export default function UserActiveAssetsPage() {
 
     return (
         <div className="space-y-6">
-            {/* --- 3. แปลข้อความ --- */}
             <div className="flex justify-between items-center">
-                <div>
+                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Package className="h-6 w-6" />
-                        {t('active_assets_title')}
+                        <Package className="h-6 w-6" /> 
+                        {t('currently_assigned_assets_title')}
                     </h1>
-                    <p className="text-muted-foreground mt-1">{t('active_assets_description', { name: userName })}</p>
+                    <p className="text-muted-foreground mt-1">{t('user_asset_description', { name: user?.name || '...' })}</p>
                 </div>
                 <Button variant="outline" onClick={() => navigate(`/users/${userId}/assets`)}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     {t('back_to_full_history_button')}
                 </Button>
             </div>
+
             <Card>
                 <CardHeader>
-                    <CardTitle>{t('active_assets_card_title', { count: assets.length })}</CardTitle>
+                    <CardTitle>{t('currently_assigned_assets_title')}</CardTitle>
+                    <CardDescription>{t('currently_assigned_assets_desc')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="border rounded-md">
@@ -70,19 +94,21 @@ export default function UserActiveAssetsPage() {
                                     <th className="p-2 text-left">{t('tableHeader_product')}</th>
                                     <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
                                     <th className="p-2 text-left">{t('tableHeader_assignedDate')}</th>
-                                    <th className="p-2 text-left">{t('tableHeader_assignmentId')}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {assets.map(item => (
-                                    <tr key={item.id} className="border-b">
-                                        <td className="p-2">{item.assetCode}</td>
-                                        <td className="p-2">{item.productModel.modelNumber}</td>
-                                        <td className="p-2">{item.serialNumber || 'N/A'}</td>
-                                        <td className="p-2">{new Date(item.assignedDate).toLocaleDateString()}</td>
-                                        <td className="p-2">#{item.assignmentId}</td>
+                                {activeAssets.length > 0 ? activeAssets.map(h => (
+                                    <tr key={`${h.assignmentId}-${h.inventoryItemId}`} className="border-b">
+                                        <td className="p-2 font-semibold">{h.inventoryItem.assetCode}</td>
+                                        <td className="p-2">{h.inventoryItem.productModel.modelNumber}</td>
+                                        <td className="p-2">{h.inventoryItem.serialNumber}</td>
+                                        {/* --- START: 4. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ตาราง) --- */}
+                                        <td className="p-2">{formatDateByLocale(h.assignedAt, i18n.language)}</td>
+                                        {/* --- END --- */}
                                     </tr>
-                                ))}
+                                )) : (
+                                    <tr><td colSpan="4" className="p-4 text-center text-muted-foreground">{t('no_active_assets_for_user')}</td></tr>
+                                )}
                             </tbody>
                         </table>
                     </div>

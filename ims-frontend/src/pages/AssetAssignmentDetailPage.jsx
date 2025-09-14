@@ -31,6 +31,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTranslation } from "react-i18next";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) => {
     const { t } = useTranslation();
@@ -142,7 +146,27 @@ const ReturnItemsDialog = ({ isOpen, onOpenChange, itemsToReturn, onConfirm }) =
     );
 };
 
-const PrintableHeaderCard = ({ assignment, formattedAssignmentId, t, profile }) => (
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
+
+// --- START: 3. อัปเดต Props ของ PrintableHeaderCard ให้รับวันที่ที่จัดรูปแบบแล้ว ---
+const PrintableHeaderCard = ({ assignment, formattedAssignmentId, t, profile, formattedAssignedDate }) => (
+// --- END ---
     <Card className="hidden print:block mb-0 border-black rounded-b-none border-b-0">
         <CardHeader className="text-center p-4">
             <h1 className="text-lg font-bold">{profile.name}</h1>
@@ -154,24 +178,26 @@ const PrintableHeaderCard = ({ assignment, formattedAssignmentId, t, profile }) 
         </CardContent>
         <CardContent className="p-4">
              <div className="grid grid-cols-2 gap-6 text-xs">
-                <div className="space-y-1">
-                    <p className="text-slate-600">{t('printable_borrower')}</p>
-                    <p className="font-semibold">{assignment.assignee.name}</p>
-                    <p className="text-slate-600">{t('printable_department')}: {assignment.assignee.department || 'N/A'}</p>
-                </div>
-                <div className="space-y-1 text-right">
-                    <p className="text-slate-600">{t('printable_doc_id')}</p>
-                    <p className="font-semibold">ASSIGN-{formattedAssignmentId}</p>
-                    <p className="text-slate-600">{t('printable_borrow_date')}</p>
-                    <p className="font-semibold">{new Date(assignment.assignedDate).toLocaleDateString('th-TH')}</p>
-                </div>
-            </div>
-            {assignment.notes && (
-                 <div className="mt-4">
-                    <p className="font-semibold text-xs">{t('notes')}:</p>
-                    <p className="whitespace-pre-wrap text-xs text-slate-700 border p-2 rounded-md bg-slate-50">{assignment.notes}</p>
-                </div>
-            )}
+                 <div className="space-y-1">
+                     <p className="text-slate-600">{t('printable_borrower')}</p>
+                     <p className="font-semibold">{assignment.assignee.name}</p>
+                     <p className="text-slate-600">{t('printable_department')}: {assignment.assignee.department || 'N/A'}</p>
+                 </div>
+                 <div className="space-y-1 text-right">
+                     <p className="text-slate-600">{t('printable_doc_id')}</p>
+                     <p className="font-semibold">ASSIGN-{formattedAssignmentId}</p>
+                     <p className="text-slate-600">{t('printable_borrow_date')}</p>
+                     {/* --- START: 4. ใช้ Props วันที่ที่จัดรูปแบบแล้ว (สำหรับพิมพ์) --- */}
+                     <p className="font-semibold">{formattedAssignedDate}</p>
+                     {/* --- END --- */}
+                 </div>
+             </div>
+             {assignment.notes && (
+                  <div className="mt-4">
+                     <p className="font-semibold text-xs">{t('notes')}:</p>
+                     <p className="whitespace-pre-wrap text-xs text-slate-700 border p-2 rounded-md bg-slate-50">{assignment.notes}</p>
+                 </div>
+             )}
         </CardContent>
     </Card>
 );
@@ -211,7 +237,9 @@ const PrintableItemsCard = ({ assignment, t }) => (
 export default function AssetAssignmentDetailPage() {
     const { assignmentId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: 5. แก้ไข Hook เพื่อดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const { user: currentUser } = useAuthStore((state) => state);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
@@ -268,6 +296,10 @@ export default function AssetAssignmentDetailPage() {
     const itemsToReturn = assignment.items.filter(item => !item.returnedAt && item.inventoryItem);
     const formattedAssignmentId = assignment.id.toString().padStart(6, '0');
 
+    // --- START: 6. สร้างตัวแปรวันที่ที่จัดรูปแบบแล้ว ---
+    const formattedAssignedDate = formatDateByLocale(assignment.assignedDate, i18n.language);
+    // --- END ---
+
     return (
         <div>
             <div className="no-print space-y-6">
@@ -298,74 +330,78 @@ export default function AssetAssignmentDetailPage() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                      <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
+                         <CardHeader>
+                             <div className="flex justify-between items-start">
                                  <div>
-                                    <CardTitle>{t('assignment_details_card_title')}</CardTitle>
-                                    <CardDescription>{t('record_id')} #{formattedAssignmentId}</CardDescription>
-                                </div>
+                                     <CardTitle>{t('assignment_details_card_title')}</CardTitle>
+                                     <CardDescription>{t('record_id')} #{formattedAssignmentId}</CardDescription>
+                                 </div>
                                  <StatusBadge status={assignment.status} className="w-28 text-base"/>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div>
-                                    <h4 className="font-semibold">{t('assignee')}</h4>
-                                    <p>{assignment.assignee.name}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold">{t('assignment_date')}</h4>
-                                    <p>{new Date(assignment.assignedDate).toLocaleString()}</p>
-                                </div>
+                             </div>
+                         </CardHeader>
+                         <CardContent className="space-y-4">
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                  <div>
-                                    <h4 className="font-semibold">{t('assigned_by')}</h4>
-                                    <p>{assignment.approvedBy?.name || 'N/A'}</p>
-                                </div>
-                            </div>
-                             {assignment.notes && (
-                                <div>
-                                    <h4 className="font-semibold">{t('notes')}</h4>
-                                    <p className="whitespace-pre-wrap text-sm text-muted-foreground border p-3 rounded-md bg-muted/30">{assignment.notes}</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                     <h4 className="font-semibold">{t('assignee')}</h4>
+                                     <p>{assignment.assignee.name}</p>
+                                 </div>
+                                 <div>
+                                     <h4 className="font-semibold">{t('assignment_date')}</h4>
+                                     {/* --- START: 7. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ในหน้าเว็บ Card) --- */}
+                                     <p>{formattedAssignedDate}</p>
+                                     {/* --- END --- */}
+                                 </div>
+                                  <div>
+                                     <h4 className="font-semibold">{t('assigned_by')}</h4>
+                                     <p>{assignment.approvedBy?.name || 'N/A'}</p>
+                                 </div>
+                             </div>
+                              {assignment.notes && (
+                                 <div>
+                                     <h4 className="font-semibold">{t('notes')}</h4>
+                                     <p className="whitespace-pre-wrap text-sm text-muted-foreground border p-3 rounded-md bg-muted/30">{assignment.notes}</p>
+                                 </div>
+                             )}
+                         </CardContent>
+                     </Card>
 
-                    <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <CardTitle>{t('assigned_assets_title', { count: assignment.items.length })}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             <div className="border rounded-lg overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/40">
-                                            <th className="p-2 text-left">{t('tableHeader_assetCode')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_category')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_brand')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_productModel')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_status')}</th>
-                                            <th className="p-2 text-left">{t('tableHeader_returnDate')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {assignment.items.map(record => (
-                                            <tr key={record.inventoryItemId} className="border-b">
-                                                <td className="p-2">{record.inventoryItem?.assetCode || 'N/A'}</td>
-                                                <td className="p-2">{record.inventoryItem?.productModel?.category?.name || 'N/A'}</td>
-                                                <td className="p-2">{record.inventoryItem?.productModel?.brand?.name || 'N/A'}</td>
-                                                <td className="p-2">{record.inventoryItem?.productModel?.modelNumber || 'N/A'}</td>
-                                                <td className="p-2">{record.inventoryItem?.serialNumber || 'N/A'}</td>
-                                                <td className="p-2"><StatusBadge status={record.returnedAt ? 'RETURNED' : 'ASSIGNED'} /></td>
-                                                <td className="p-2">{record.returnedAt ? new Date(record.returnedAt).toLocaleString() : 'N/A'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                     <Card className="lg:col-span-3">
+                         <CardHeader>
+                             <CardTitle>{t('assigned_assets_title', { count: assignment.items.length })}</CardTitle>
+                         </CardHeader>
+                         <CardContent>
+                              <div className="border rounded-lg overflow-x-auto">
+                                 <table className="w-full text-sm">
+                                     <thead>
+                                         <tr className="border-b bg-muted/40">
+                                             <th className="p-2 text-left">{t('tableHeader_assetCode')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_category')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_brand')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_productModel')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_status')}</th>
+                                             <th className="p-2 text-left">{t('tableHeader_returnDate')}</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody>
+                                         {assignment.items.map(record => (
+                                             <tr key={record.inventoryItemId} className="border-b">
+                                                 <td className="p-2">{record.inventoryItem?.assetCode || 'N/A'}</td>
+                                                 <td className="p-2">{record.inventoryItem?.productModel?.category?.name || 'N/A'}</td>
+                                                 <td className="p-2">{record.inventoryItem?.productModel?.brand?.name || 'N/A'}</td>
+                                                 <td className="p-2">{record.inventoryItem?.productModel?.modelNumber || 'N/A'}</td>
+                                                 <td className="p-2">{record.inventoryItem?.serialNumber || 'N/A'}</td>
+                                                 <td className="p-2"><StatusBadge status={record.returnedAt ? 'RETURNED' : 'ASSIGNED'} /></td>
+                                                 {/* --- START: 8. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ในหน้าเว็บ Table) --- */}
+                                                 <td className="p-2">{record.returnedAt ? formatDateByLocale(record.returnedAt, i18n.language) : 'N/A'}</td>
+                                                 {/* --- END --- */}
+                                             </tr>
+                                         ))}
+                                     </tbody>
+                                 </table>
+                             </div>
+                         </CardContent>
+                     </Card>
                 </div>
 
                 <ReturnItemsDialog
@@ -377,7 +413,15 @@ export default function AssetAssignmentDetailPage() {
             </div>
             
             <div className="hidden print:block printable-area font-sarabun">
-                <PrintableHeaderCard assignment={assignment} formattedAssignmentId={formattedAssignmentId} t={t} profile={companyProfile} />
+                {/* --- START: 9. ส่ง Props วันที่ ไปยัง Component สำหรับพิมพ์ --- */}
+                <PrintableHeaderCard 
+                    assignment={assignment} 
+                    formattedAssignmentId={formattedAssignmentId} 
+                    t={t} 
+                    profile={companyProfile} 
+                    formattedAssignedDate={formattedAssignedDate} 
+                />
+                {/* --- END --- */}
                 <PrintableItemsCard assignment={assignment} t={t} />
 
                 <div className="signature-section">

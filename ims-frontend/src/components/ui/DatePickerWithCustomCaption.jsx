@@ -29,10 +29,7 @@ const formatToBuddhistYear = (date, fmt) => {
   return format(date, formatString, { locale: th });
 };
 
-// This component remains mostly the same, but the key fix is inside the Year <SelectTrigger>
-function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale }) {
-  const isThai = locale?.code === 'th';
-
+function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale, isThai }) {
   const years = Array.from({ length: (toYear || 0) - (fromYear || 0) + 1 }, (_, i) => (fromYear || 0) + i).reverse();
   
   const months = Array.from({ length: 12 }, (_, i) => {
@@ -70,10 +67,9 @@ function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale }
         }}
       >
         <SelectTrigger className="w-[100px]">
-           {/* This is the corrected part. It now explicitly displays the correct year format. */}
-          <span className="truncate">
+          <SelectValue>
             {isThai ? displayMonth.getFullYear() + 543 : displayMonth.getFullYear()}
-          </span>
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {years.map((year) => (
@@ -133,6 +129,18 @@ export function DatePickerWithCustomCaption({ value, onChange }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0">
+        <div className="p-3">
+          <CustomCaption 
+            displayMonth={date || new Date()}
+            onMonthChange={(newDate) => {
+              setDate(newDate);
+            }}
+            fromYear={fromYear} 
+            toYear={toYear} 
+            locale={isThai ? th : undefined}
+            isThai={isThai}
+          />
+        </div>
         <DayPicker
           mode="single"
           selected={date}
@@ -140,15 +148,15 @@ export function DatePickerWithCustomCaption({ value, onChange }) {
           locale={isThai ? th : undefined}
           fromYear={fromYear}
           toYear={toYear}
-          captionLayout="dropdown"
-          components={{
-            Caption: (props) => (
-              <CustomCaption {...props} fromYear={fromYear} toYear={toYear} locale={isThai ? th : undefined} />
-            )
+          month={date || new Date()}
+          onMonthChange={(newMonth) => {
+            setDate(newMonth);
           }}
+          showOutsideDays
           classNames={{
-            caption_label: "hidden",
-            nav_button: "h-6 w-6"
+            caption: "hidden",
+            nav_button: "h-6 w-6",
+            nav: "hidden" // ซ่อนปุ่ม navigation
           }}
         />
       </PopoverContent>

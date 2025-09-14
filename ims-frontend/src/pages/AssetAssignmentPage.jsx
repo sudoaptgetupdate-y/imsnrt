@@ -16,6 +16,10 @@ import { useTranslation } from "react-i18next";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
+// --- START: 1. Import เครื่องมือสำหรับวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const SkeletonRow = () => (
     <TableRow>
@@ -30,9 +34,28 @@ const SkeletonRow = () => (
     </TableRow>
 );
 
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ ---
+const formatDateByLocale = (dateString, localeCode) => {
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
+
 export default function AssetAssignmentPage() {
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: 3. ดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const { user: currentUser } = useAuthStore((state) => state);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
 
@@ -110,8 +133,10 @@ export default function AssetAssignmentPage() {
                                 <TableRow key={a.id}>
                                     <TableCell>#{a.id}</TableCell>
                                     <TableCell>{a.assignee.name}</TableCell>
-                                    <TableCell>{new Date(a.assignedDate).toLocaleDateString()}</TableCell>
-                                    <TableCell>{a.returnDate ? new Date(a.returnDate).toLocaleDateString() : 'N/A'}</TableCell>
+                                    {/* --- START: 4. อัปเดตรูปแบบวันที่ --- */}
+                                    <TableCell>{formatDateByLocale(a.assignedDate, i18n.language)}</TableCell>
+                                    <TableCell>{a.returnDate ? formatDateByLocale(a.returnDate, i18n.language) : 'N/A'}</TableCell>
+                                    {/* --- END --- */}
                                     <TableCell className="text-center">
                                         <StatusBadge 
                                             status={a.status} 

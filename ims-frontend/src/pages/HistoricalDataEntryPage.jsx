@@ -39,6 +39,13 @@ const HistoricalDataEntryPage = () => {
         isMacRequired: false,
     });
 
+    // --- START: เพิ่มฟังก์ชันนี้เพื่ออัปเดต State ทั้งสอง ---
+    const handleCreatedAtChange = (newDate) => {
+        setCreatedAt(newDate);
+        setSaleDate(newDate); // อัปเดต Sale Date ให้เป็นวันเดียวกับ Creation Date
+    };
+    // --- END ---
+
     const formatMacAddress = (value) => {
         const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
         if (cleaned.length === 0) return '';
@@ -204,7 +211,9 @@ const HistoricalDataEntryPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="createdAt">{t('historical_item_creation_date')} *</Label>
-                        <DatePickerWithCustomCaption value={createdAt} onChange={setCreatedAt} />
+                        {/* --- START: แก้ไข onChange ที่นี่ --- */}
+                        <DatePickerWithCustomCaption value={createdAt} onChange={handleCreatedAtChange} />
+                        {/* --- END --- */}
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="saleDate">{t('historical_sale_date')} *</Label>

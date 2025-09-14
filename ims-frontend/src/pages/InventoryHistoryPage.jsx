@@ -17,6 +17,10 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { getStatusProperties } from "@/lib/statusUtils";
 import { useTranslation } from "react-i18next";
 import { Separator } from "@/components/ui/separator";
+// --- START: เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const eventConfig = {
     CREATE: { icon: <PlusCircle className="h-4 w-4" /> },
@@ -46,7 +50,9 @@ const displayFormattedMac = (mac) => {
 export default function InventoryHistoryPage() {
     const { itemId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: เรียกใช้ i18n ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const [itemDetails, setItemDetails] = useState(null);
     const [history, setHistory] = useState([]);
@@ -71,6 +77,24 @@ export default function InventoryHistoryPage() {
         };
         fetchData();
     }, [itemId, token]);
+
+    // --- START: เพิ่มฟังก์ชันจัดรูปแบบวันที่ตามภาษา ---
+    const formatDateByLocale = (dateString, localeCode) => {
+        try {
+            const date = new Date(dateString);
+            if (localeCode.startsWith('th')) {
+                // ถ้าเป็นภาษาไทย: แสดงเป็น DD/MM/BBBB (พ.ศ.)
+                const buddhistYear = date.getFullYear() + 543;
+                // ใช้ format 'dd/MM' และต่อด้วยปี พ.ศ. เพื่อให้แน่ใจว่าได้รูปแบบที่ถูกต้อง
+                return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+            }
+            // ถ้าเป็นภาษาอังกฤษ: แสดงเป็น DD/MM/YYYY (ค.ศ.)
+            return format(date, 'dd/MM/yyyy');
+        } catch (error) {
+            return "Invalid Date";
+        }
+    };
+    // --- END ---
 
     const getTransactionLink = (eventType, details) => {
         if (!details) return null;
@@ -201,7 +225,9 @@ export default function InventoryHistoryPage() {
                                         const { label: eventLabel } = getStatusProperties(displayStatus);
                                         return (
                                         <tr key={event.id} className="border-b">
-                                            <td className="p-2">{new Date(event.createdAt).toLocaleString()}</td>
+                                            {/* --- START: แก้ไขการแสดงผลวันที่ --- */}
+                                            <td className="p-2">{formatDateByLocale(event.createdAt, i18n.language)}</td>
+                                            {/* --- END --- */}
                                             <td className="p-2" title={event.details?.details || 'N/A'}>
                                                 {event.details?.details || 'N/A'}
                                             </td>

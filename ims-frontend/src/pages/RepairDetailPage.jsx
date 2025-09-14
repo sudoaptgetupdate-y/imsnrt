@@ -29,6 +29,10 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+// --- START: เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const RepairItemReturnDialog = ({ items, onReturn, repairId, repairStatus }) => {
     const { t } = useTranslation();
@@ -188,7 +192,9 @@ const PrintableTitleCard = () => (
     </Card>
 );
 
-const PrintableHeaderCard = ({ repairOrder, getOwnerInfo, t }) => (
+// --- START: แก้ไข Signature ของ Component ให้รับ formattedDate ---
+const PrintableHeaderCard = ({ repairOrder, getOwnerInfo, t, formattedDate }) => (
+// --- END ---
     <Card className="hidden print:block mt-0 border-black rounded-none border-b-0">
         <CardHeader className="p-4 border-t border-black">
             <div className="grid grid-cols-2 gap-x-8 text-xs">
@@ -209,7 +215,9 @@ const PrintableHeaderCard = ({ repairOrder, getOwnerInfo, t }) => (
             </div>
              <div className="mt-4 space-y-1 text-xs">
                 <p><span className="font-semibold">Repair Order #{repairOrder.id} {getOwnerInfo()}</span></p>
-                <p><span className="text-slate-600">{t('tableHeader_repairDate')}:</span> <span className="font-semibold">{new Date(repairOrder.repairDate).toLocaleString('th-TH')}</span></p>
+                {/* --- START: ใช้ formattedDate ที่ส่งเข้ามา --- */}
+                <p><span className="text-slate-600">{t('tableHeader_repairDate')}:</span> <span className="font-semibold">{formattedDate}</span></p>
+                {/* --- END --- */}
                 <p><span className="text-slate-600">{t('tableHeader_createdBy')}:</span> <span className="font-semibold">{repairOrder.createdBy.name}</span></p>
                 {repairOrder.customer && <p><span className="text-slate-600">{t('tableHeader_customer')}:</span> <span className="font-semibold">{repairOrder.customer.name}</span></p>}
             </div>
@@ -263,12 +271,31 @@ const PrintableItemsCard = ({ repairOrder, t }) => (
 export default function RepairDetailPage() {
     const { repairId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: ดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const { user: currentUser } = useAuthStore((state) => state);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
     const [repairOrder, setRepairOrder] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    // --- START: เพิ่มฟังก์ชันจัดรูปแบบวันที่ ---
+    const formatDateByLocale = (dateString, localeCode) => {
+        try {
+            const date = new Date(dateString);
+            if (localeCode.startsWith('th')) {
+                // TH: DD/MM/BBBB (Buddhist Year)
+                const buddhistYear = date.getFullYear() + 543;
+                return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+            }
+            // EN: DD/MM/YYYY (Christian Year)
+            return format(date, 'dd/MM/yyyy');
+        } catch (error) {
+            return "Invalid Date";
+        }
+    };
+    // --- END ---
 
     const fetchRepairOrder = async () => {
         try {
@@ -303,6 +330,10 @@ export default function RepairDetailPage() {
 
     if (isLoading) return <div>Loading...</div>;
     if (!repairOrder) return <div>Repair order not found.</div>;
+
+    // --- START: สร้างตัวแปรวันที่ที่จัดรูปแบบแล้ว ---
+    const formattedRepairDate = formatDateByLocale(repairOrder.repairDate, i18n.language);
+    // --- END ---
 
     return (
         <div className="space-y-6">
@@ -346,7 +377,9 @@ export default function RepairDetailPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label>{t('tableHeader_repairDate')}</Label>
-                                    <p>{new Date(repairOrder.repairDate).toLocaleString()}</p>
+                                    {/* --- START: ใช้ formattedRepairDate --- */}
+                                    <p>{formattedRepairDate}</p>
+                                    {/* --- END --- */}
                                 </div>
                                 <div className="space-y-1">
                                     <Label>{t('tableHeader_createdBy')}</Label>
@@ -405,7 +438,9 @@ export default function RepairDetailPage() {
                 
                 <div className="hidden print:block">
                     <PrintableTitleCard />
-                    <PrintableHeaderCard repairOrder={repairOrder} getOwnerInfo={getOwnerInfo} t={t} />
+                    {/* --- START: ส่ง formattedDate เข้าไป --- */}
+                    <PrintableHeaderCard repairOrder={repairOrder} getOwnerInfo={getOwnerInfo} t={t} formattedDate={formattedRepairDate} />
+                    {/* --- END --- */}
                     <PrintableItemsCard repairOrder={repairOrder} t={t} />
                 </div>
 

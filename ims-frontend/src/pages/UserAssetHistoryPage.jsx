@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { ArrowLeft, Package, History, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { useTranslation } from "react-i18next";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const StatCard = ({ title, value, icon, description, onClick }) => (
     <Card onClick={onClick} className={onClick ? "cursor-pointer hover:border-primary transition-colors" : ""}>
@@ -24,10 +28,30 @@ const StatCard = ({ title, value, icon, description, onClick }) => (
     </Card>
 );
 
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
+
 export default function UserAssetHistoryPage() {
     const { userId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation(); // --- 2. เรียกใช้ useTranslation ---
+    // --- START: 3. แก้ไข Hook เพื่อดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation(); 
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const [user, setUser] = useState(null);
     const [history, setHistory] = useState([]);
@@ -59,7 +83,6 @@ export default function UserAssetHistoryPage() {
 
     return (
         <div className="space-y-6">
-            {/* --- 3. แปลข้อความ --- */}
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -111,8 +134,10 @@ export default function UserAssetHistoryPage() {
                                     <tr key={`${h.assignmentId}-${h.inventoryItemId}`} className="border-b">
                                         <td className="p-2 font-semibold">{h.inventoryItem.assetCode}</td>
                                         <td className="p-2">{h.inventoryItem.productModel.modelNumber}</td>
-                                        <td className="p-2">{new Date(h.assignedAt).toLocaleString()}</td>
-                                        <td className="p-2">{h.returnedAt ? new Date(h.returnedAt).toLocaleString() : <Badge variant="warning">{t('status_in_possession')}</Badge>}</td>
+                                        {/* --- START: 4. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ตาราง) --- */}
+                                        <td className="p-2">{formatDateByLocale(h.assignedAt, i18n.language)}</td>
+                                        <td className="p-2">{h.returnedAt ? formatDateByLocale(h.returnedAt, i18n.language) : <Badge variant="warning">{t('status_in_possession')}</Badge>}</td>
+                                        {/* --- END --- */}
                                     </tr>
                                 )) : (
                                     <tr><td colSpan="4" className="p-4 text-center text-muted-foreground">{t('no_assignment_history_for_user')}</td></tr>
