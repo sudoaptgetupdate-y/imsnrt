@@ -84,7 +84,9 @@ function CustomCaption({ displayMonth, onMonthChange, fromYear, toYear, locale, 
 }
 
 export function DatePickerWithCustomCaption({ value, onChange }) {
-  const { i18n } = useTranslation();
+  // --- START: 1. เรียกใช้ t function ---
+  const { i18n, t } = useTranslation();
+  // --- END ---
   const isThai = i18n.language.startsWith('th');
   
   const [date, setDate] = React.useState(value ? new Date(value) : null);
@@ -124,7 +126,9 @@ export function DatePickerWithCustomCaption({ value, onChange }) {
               ? formatToBuddhistYear(date, 'dd MMMM yyyy') 
               : format(date, "PPP")
           ) : (
-            <span>Pick a date</span>
+            // --- START: 2. แปลข้อความ ---
+            <span>{t('pick_a_date')}</span>
+            // --- END ---
           )}
         </Button>
       </PopoverTrigger>

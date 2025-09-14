@@ -100,7 +100,9 @@ const HistoricalItemInputs = ({ items, setItems, t }) => {
             }
         }
 
-        const noteToAdd = currentItem.notes.trim() === '' ? "ข้อมูลนำเข้าย้อนหลัง" : currentItem.notes;
+        // --- START: TRANSLATED ---
+        const noteToAdd = currentItem.notes.trim() === '' ? t('historical_default_note') : currentItem.notes;
+        // --- END ---
         setItems([...items, { ...currentItem, notes: noteToAdd, id: Date.now() }]);
         setCurrentItem(prev => ({
             ...prev, serialNumber: '', macAddress: '', notes: '',
@@ -140,10 +142,12 @@ const HistoricalItemInputs = ({ items, setItems, t }) => {
                     <Input id="macAddress" value={currentItem.macAddress} onChange={handleMacAddressChange} required={currentItem.isMacRequired} disabled={!currentItem.productModel} maxLength={17} placeholder={t('mac_address_placeholder')} />
                 </div>
             </div>
+            {/* --- START: TRANSLATED --- */}
             <div className="space-y-2">
-                <Label htmlFor="notes">{t('notes_label')} <span className="text-xs text-slate-500 ml-2">(หากเว้นว่าง ระบบจะใส่ "ข้อมูลนำเข้าย้อนหลัง")</span></Label>
-                <Textarea id="notes" value={currentItem.notes} onChange={e => setCurrentItem(prev => ({...prev, notes: e.target.value}))} disabled={!currentItem.productModel} placeholder="Add optional notes..." rows={2} />
+                <Label htmlFor="notes">{t('notes_label')} <span className="text-xs text-slate-500 ml-2">{t('historical_note_placeholder_hint')}</span></Label>
+                <Textarea id="notes" value={currentItem.notes} onChange={e => setCurrentItem(prev => ({...prev, notes: e.target.value}))} disabled={!currentItem.productModel} placeholder={t('historical_notes_placeholder')} rows={2} />
             </div>
+            {/* --- END --- */}
             <Button onClick={handleAddItem} disabled={!currentItem.productModel}>{t('historical_add_item_button')}</Button>
         </div>
     );
@@ -159,9 +163,11 @@ const HistoricalItemList = ({ items, setItems, t }) => {
 
     if (items.length === 0) {
         return (
+             // --- START: TRANSLATED ---
             <div className="text-center text-muted-foreground py-4">
-                {t('no_items_added_yet')} (ยังไม่มีรายการ)
+                {t('no_items_added_yet')}
             </div>
+             // --- END ---
         );
     }
 
@@ -171,9 +177,11 @@ const HistoricalItemList = ({ items, setItems, t }) => {
                 <div key={item.id} className="flex justify-between items-start p-3 border-b last:border-b-0">
                     <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{item.productModel.modelNumber}</p>
-                        <p className="text-sm text-muted-foreground">S/N: {item.serialNumber || 'N/A'}</p>
-                        {item.macAddress && <p className="text-xs text-muted-foreground">MAC: {item.macAddress}</p>}
-                        {item.notes && <p className="text-xs text-muted-foreground italic mt-1 break-words">Note: {item.notes}</p>}
+                         {/* --- START: TRANSLATED --- */}
+                        <p className="text-sm text-muted-foreground">{t('historical_sn_prefix')}{item.serialNumber || 'N/A'}</p>
+                        {item.macAddress && <p className="text-xs text-muted-foreground">{t('historical_mac_prefix')}{item.macAddress}</p>}
+                        {item.notes && <p className="text-xs text-muted-foreground italic mt-1 break-words">{t('historical_note_prefix')}{item.notes}</p>}
+                         {/* --- END --- */}
                     </div>
                     <Button variant="ghost" size="icon" className="ml-2 shrink-0" onClick={() => handleRemoveItem(item.id)}>
                         <Trash2 className="h-4 w-4 text-red-500"/>
@@ -280,10 +288,14 @@ const HistoricalDataEntryPage = () => {
                     notes: `Historical data entry (Borrow) for ${borrowItems.length} item(s).`
                 };
                 await axiosInstance.post('/borrowings/historical', borrowPayload, { headers: { Authorization: `Bearer ${token}` } });
-                toast.success('Historical borrowing record created successfully.');
+                // --- START: TRANSLATED ---
+                toast.success(t('success_historical_borrow_created'));
+                // --- END ---
                 navigate('/inventory');
             } catch (error) {
-                toast.error(error.response?.data?.error || 'Failed to create historical borrowing record.');
+                 // --- START: TRANSLATED ---
+                toast.error(error.response?.data?.error || t('error_historical_borrow_failed'));
+                // --- END ---
             }
         }
     };
@@ -309,8 +321,10 @@ const HistoricalDataEntryPage = () => {
                         <CardContent className="pt-6">
                              <Tabs defaultValue="sale" className="w-full" onValueChange={setActiveTab}>
                                 <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="sale">นำเข้าข้อมูลการขายย้อนหลัง</TabsTrigger>
-                                    <TabsTrigger value="borrow">นำเข้าข้อมูลการยืมย้อนหลัง</TabsTrigger>
+                                    {/* --- START: TRANSLATED --- */}
+                                    <TabsTrigger value="sale">{t('historical_tab_sale')}</TabsTrigger>
+                                    <TabsTrigger value="borrow">{t('historical_tab_borrow')}</TabsTrigger>
+                                    {/* --- END --- */}
                                 </TabsList>
                                 
                                 {/* --- TAB 1: SALE FORM --- */}
@@ -355,7 +369,9 @@ const HistoricalDataEntryPage = () => {
                                                 <DatePickerWithCustomCaption value={borrowDate} onChange={setBorrowDate} />
                                             </div>
                                             <div className="space-y-2 md:col-span-3"> 
-                                                <Label htmlFor="dueDate">{t('due_date_label')} (Optional)</Label>
+                                                {/* --- START: TRANSLATED --- */}
+                                                <Label htmlFor="dueDate">{t('due_date_label')} {t('optional_label')}</Label>
+                                                {/* --- END --- */}
                                                 <DatePickerWithCustomCaption value={dueDate} onChange={setDueDate} />
                                             </div>
                                         </div>
@@ -375,16 +391,18 @@ const HistoricalDataEntryPage = () => {
                 <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-4">
                     <Card>
                         <CardHeader>
+                             {/* --- START: TRANSLATED --- */}
                             <CardTitle className="flex items-center gap-2">
                                 <ListChecks className="h-5 w-5" />
-                                รายการสรุป (Summary)
+                                {t('historical_summary_title')}
                             </CardTitle>
                             <CardDescription>
                                 {activeTab === 'sale' ? 
-                                    `รายการที่จะบันทึก "ขาย" (${saleItems.length} รายการ)` : 
-                                    `รายการที่จะบันทึก "ยืม" (${borrowItems.length} รายการ)`
+                                    t('historical_summary_desc_sale', { count: saleItems.length }) : 
+                                    t('historical_summary_desc_borrow', { count: borrowItems.length })
                                 }
                             </CardDescription>
+                             {/* --- END --- */}
                         </CardHeader>
                         <CardContent>
                             {/* แสดงผล List ตาม Tab ที่เลือก */}
@@ -398,7 +416,9 @@ const HistoricalDataEntryPage = () => {
                     
                     <Card>
                         <CardHeader>
-                            <CardTitle>ยืนยันการบันทึกข้อมูล</CardTitle>
+                             {/* --- START: TRANSLATED --- */}
+                            <CardTitle>{t('historical_confirm_title')}</CardTitle>
+                             {/* --- END --- */}
                         </CardHeader>
                         <CardContent>
                             {/* แสดงปุ่ม Submit ตาม Tab ที่เลือก */}
@@ -409,7 +429,9 @@ const HistoricalDataEntryPage = () => {
                                     onClick={handleSubmitSale} 
                                     disabled={saleItems.length === 0 || !saleCustomerId || !saleDate || !saleCreatedAt}
                                 >
-                                    บันทึกข้อมูลการขาย (Sale)
+                                    {/* --- START: TRANSLATED --- */}
+                                    {t('historical_submit_sale_button')}
+                                    {/* --- END --- */}
                                 </Button>
                             ) : (
                                 <Button 
@@ -417,9 +439,13 @@ const HistoricalDataEntryPage = () => {
                                     className="w-full"
                                     onClick={handleSubmitBorrow} 
                                     disabled={borrowItems.length === 0 || !borrowCustomerId || !borrowDate || !borrowCreatedAt}
-                                    variant="secondary"
+                                    // --- START: MODIFIED - ลบ variant="secondary" ออก ---
+                                    // variant="secondary" 
+                                    // --- END: MODIFIED ---
                                 >
-                                    บันทึกข้อมูลการยืม (Borrow)
+                                    {/* --- START: TRANSLATED --- */}
+                                    {t('historical_submit_borrow_button')}
+                                    {/* --- END --- */}
                                 </Button>
                             )}
                         </CardContent>
