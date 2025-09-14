@@ -16,6 +16,7 @@ import LoginPage from './pages/LoginPage.jsx';
 // Lazy load all the pages
 const DashboardRedirect = lazy(() => import('./components/auth/DashboardRedirect.jsx'));
 const InventoryPage = lazy(() => import('./pages/InventoryPage.jsx'));
+const MasterSearchPage = lazy(() => import('./pages/MasterSearchPage.jsx')); 
 const UserManagementPage = lazy(() => import('./pages/UserManagementPage.jsx'));
 const BrandPage = lazy(() => import('./pages/BrandPage.jsx'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage.jsx'));
@@ -77,6 +78,7 @@ const generalRoutes = [
   { path: 'asset-assignments/new', Page: CreateAssetAssignmentPage },
   { path: 'asset-assignments/:assignmentId', Page: AssetAssignmentDetailPage },
   { path: 'inventory', Page: InventoryPage },
+  { path: 'master-search', Page: MasterSearchPage },
   { path: 'inventory/:itemId/history', Page: InventoryHistoryPage },
   { path: 'assets', Page: AssetPage },
   { path: 'assets/new', Page: CreateAssetPage },

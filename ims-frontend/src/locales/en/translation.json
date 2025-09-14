@@ -635,5 +635,6 @@
   "borrow_date_label": "Borrow Date",
   "no_items_added_yet": "No items added yet.",
   "pick_a_date": "Pick a date",
-  "due_date_label": "Due Date"
+  "due_date_label": "Due Date",
+  "inventory_archive_menu": "Inventory Archive"
 }

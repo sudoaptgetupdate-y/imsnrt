@@ -635,5 +635,6 @@
   "borrow_date_label": "วันที่ยืม",
   "no_items_added_yet": "ยังไม่มีรายการ",
   "pick_a_date": "เลือกวันที่",
-  "due_date_label": "กำหนดคืน"
+  "due_date_label": "กำหนดคืน",
+  "inventory_archive_menu": "คลังสินค้าทั้งหมด"
 }
