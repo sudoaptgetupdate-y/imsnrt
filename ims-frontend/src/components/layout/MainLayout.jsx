@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     LogOut, Menu, User, ArrowRightLeft, Building2, 
     ShoppingCart, Settings, Package, Boxes, Tag, Users as UsersIcon, 
-    HardDrive, Wrench, BookUser, Truck, Building, BarChart2, BookUp, FileSearch
+    HardDrive, Wrench, BookUser, Truck, Building, BarChart2, BookUp
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -21,7 +21,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { LanguageToggle } from "@/components/ui/LanguageToggle";
+// --- START: 1. ลบ LanguageToggle และเพิ่ม Separator ---
+// (LanguageToggle component is no longer needed here)
+import { Separator } from "@/components/ui/separator"; 
+// --- END ---
 import { toast } from 'sonner';
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
 import ntHeadLogo from '@/assets/nt-head-logo2.png';
@@ -77,7 +80,9 @@ const NavItem = ({ to, icon, text, isCollapsed, onClick }) => (
 
 
 const MainLayout = () => {
-    const { t } = useTranslation();
+    // --- START: 2. เรียก i18n มาใช้งานใน MainLayout ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const navigate = useNavigate();
     const location = useLocation();
     const logout = useAuthStore((state) => state.logout);
@@ -123,6 +128,12 @@ const MainLayout = () => {
         navigate('/login');
     };
 
+    // --- START: 3. เพิ่มฟังก์ชันสำหรับเปลี่ยนภาษา ---
+    const handleChangeLang = (lang) => {
+        i18n.changeLanguage(lang);
+    };
+    // --- END ---
+
     const SidebarContent = () => (
         <div className="flex flex-col h-full relative">
             <Link to="/dashboard" className="p-4 border-b flex items-center gap-2 h-[65px] hover:bg-muted/50 transition-colors">
@@ -159,7 +170,7 @@ const MainLayout = () => {
                     </p>
                      <div className="space-y-1">
                         <NavItem to="/inventory" icon={<Package size={18}/>} text={t('inventory')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                        <NavItem to="/master-search" icon={<FileSearch size={18}/>} text="ค้นหาสินค้าทั้งหมด" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                        {/* This NavItem for assets uses a Layers icon that is not defined. */}
                         <NavItem to="/assets" icon={<Package size={18}/>} text={t('assetList')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/product-models" icon={<Boxes size={18}/>} text={t('models')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/brands" icon={<Building2 size={18}/>} text={t('brands')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
@@ -220,7 +231,40 @@ const MainLayout = () => {
                     </div>
                     
                     <div className="flex items-center gap-4">
-                        <LanguageToggle />
+                        <div className="flex items-center gap-2">
+                            {/* ปุ่มภาษาไทย */}
+                            <Button
+                                variant="ghost"
+                                // size="sm" // <-- ลบ prop นี้ออก
+                                onClick={() => handleChangeLang('th')}
+                                disabled={i18n.language === 'th'}
+                                className={cn(
+                                    "font-semibold",
+                                    i18n.language === 'th' && "text-primary disabled:opacity-100" 
+                                )}
+                            >
+                                ภาษาไทย
+                            </Button>
+                            
+                            {/* ปุ่มภาษาอังกฤษ */}
+                            <Button
+                                variant="ghost"
+                                // size="sm" // <-- ลบ prop นี้ออก
+                                onClick={() => handleChangeLang('en')}
+                                disabled={i18n.language === 'en'}
+                                className={cn(
+                                    "font-semibold",
+                                    i18n.language === 'en' && "text-primary disabled:opacity-100"
+                                )}
+                            >
+                                English
+                            </Button>
+                        </div>
+                        
+                        {/* เส้นคั่นแนวตั้ง */}
+                        <Separator orientation="vertical" className="h-6 mx-2" /> 
+
+                        {/* User Dropdown (เหมือนเดิม) */}
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="flex items-center gap-2 h-10 px-3">

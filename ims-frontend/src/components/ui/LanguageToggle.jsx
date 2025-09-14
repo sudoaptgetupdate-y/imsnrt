@@ -1,25 +1,43 @@
 // src/components/ui/LanguageToggle.jsx
 
-import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Globe } from "lucide-react"; // --- 1. Import ไอคอน Globe ---
+import { Button } from "@/components/ui/button"
+import { useTranslation } from "react-i18next"
+// --- START: 1. Import Tooltip components ---
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+// --- END ---
 
 export function LanguageToggle() {
-  const { i18n } = useTranslation();
+  // --- START: 2. เรียก t function มาใช้งานด้วย ---
+  const { i18n, t } = useTranslation()
+  // --- END ---
 
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'th' ? 'en' : 'th';
-    i18n.changeLanguage(newLang);
-  };
+    const newLang = i18n.language === "en" ? "th" : "en"
+    i18n.changeLanguage(newLang)
+  }
 
   return (
-    // --- 2. แก้ไข Button ทั้งหมด ---
-    <Button variant="outline" size="sm" onClick={toggleLanguage}>
-      <Globe className="mr-2 h-4 w-4" />
-      <span className="font-semibold">
-        {i18n.language.toUpperCase()}
-      </span>
-      <span className="sr-only">Toggle language</span>
-    </Button>
-  );
+    // --- START: 3. ห่อหุ้มปุ่มด้วย TooltipProvider และ Tooltip ---
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* นี่คือปุ่มเดิมของคุณ */}
+          <Button variant="outline" size="icon" onClick={toggleLanguage}>
+            {i18n.language === "en" ? "TH" : "EN"}
+            <span className="sr-only">{t('toggle_language_tooltip')}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {/* เพิ่มข้อความ Tooltip โดยใช้ t() function */}
+          <p>{t('toggle_language_tooltip')}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+    // --- END ---
+  )
 }
