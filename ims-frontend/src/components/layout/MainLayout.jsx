@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
     LogOut, Menu, User, ArrowRightLeft, Building2, 
     ShoppingCart, Settings, Package, Boxes, Tag, Users as UsersIcon, 
-    HardDrive, Wrench, BookUser, Truck, Building, BarChart2, BookUp
+    HardDrive, Wrench, BookUser, Truck, Building, BarChart2, BookUp, FileSearch
 } from "lucide-react";
 import {
     DropdownMenu,
@@ -170,7 +170,7 @@ const MainLayout = () => {
                     </p>
                      <div className="space-y-1">
                         <NavItem to="/inventory" icon={<Package size={18}/>} text={t('inventory')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                        {/* This NavItem for assets uses a Layers icon that is not defined. */}
+                        <NavItem to="/master-search" icon={<FileSearch size={18}/>} text="ค้นหาสินค้าทั้งหมด" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/assets" icon={<Package size={18}/>} text={t('assetList')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/product-models" icon={<Boxes size={18}/>} text={t('models')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/brands" icon={<Building2 size={18}/>} text={t('brands')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
