@@ -34,7 +34,6 @@ const ProductModelPage = lazy(() => import('./pages/ProductModelPage.jsx'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage.jsx'));
 const AssetPage = lazy(() => import('./pages/AssetPage.jsx'));
 const CreateAssetPage = lazy(() => import('./pages/CreateAssetPage.jsx'));
-const AssetDetailPage = lazy(() => import('./pages/AssetDetailPage.jsx'));
 const AssetAssignmentPage = lazy(() => import('./pages/AssetAssignmentPage.jsx'));
 const CreateAssetAssignmentPage = lazy(() => import('./pages/CreateAssetAssignmentPage.jsx'));
 const AssetAssignmentDetailPage = lazy(() => import('./pages/AssetAssignmentDetailPage.jsx'));

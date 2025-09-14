@@ -230,12 +230,14 @@ inventoryController.addHistoricalInventory = async (req, res, next) => {
                     throw new Error(`Invalid MAC Address format for S/N ${item.serialNumber}.`);
                 }
 
+                // --- START: เพิ่ม 'notes' ในการสร้างข้อมูล ---
                 const createdItem = await tx.inventoryItem.create({
                     data: {
                         productModelId: parseInt(item.productModelId),
                         supplierId: parseInt(item.supplierId),
                         serialNumber: item.serialNumber,
                         macAddress: cleanMacAddress || null,
+                        notes: item.notes || null, // <--- เพิ่มบรรทัดนี้
                         itemType: ItemType.SALE,
                         ownerType: ItemOwner.COMPANY,
                         addedById: userId,
@@ -243,17 +245,17 @@ inventoryController.addHistoricalInventory = async (req, res, next) => {
                         createdAt: new Date(createdAt),
                     },
                 });
+                // --- END ---
 
-                // --- START: MODIFIED ---
+
                 await createEventLog(
                     tx,
                     createdItem.id,
                     userId,
                     EventType.CREATE,
                     { details: `Item created via historical entry with S/N: ${createdItem.serialNumber || 'N/A'}.` },
-                    new Date(createdAt) // Pass the historical date here
+                    new Date(createdAt) 
                 );
-                // --- END: MODIFIED ---
                 
                 createdItems.push(createdItem);
             }

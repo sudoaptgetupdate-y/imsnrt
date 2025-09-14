@@ -1,5 +1,8 @@
 // src/pages/SalePage.jsx
 
+// --- START: 1. IMPORT useMemo ---
+import { useMemo } from "react";
+// --- END ---
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "@/store/authStore";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
@@ -8,18 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
-// --- START: 1. Import ไอคอน ---
 import { PlusCircle, ArrowUpDown, ShoppingCart } from "lucide-react";
-// --- END ---
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { useTranslation } from "react-i18next";
-// --- START: 1. Import เครื่องมือสำหรับวันที่ ---
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-// --- END ---
 
 const SkeletonRow = () => (
     <TableRow>
@@ -42,7 +41,6 @@ const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort })
     </TableHead>
 );
 
-// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ ---
 const formatDateByLocale = (dateString, localeCode) => {
     try {
         const date = new Date(dateString);
@@ -57,15 +55,18 @@ const formatDateByLocale = (dateString, localeCode) => {
         return "Invalid Date";
     }
 };
-// --- END ---
 
 export default function SalePage() {
     const navigate = useNavigate();
-    // --- START: 3. ดึง i18n มาใช้งาน ---
     const { t, i18n } = useTranslation();
-    // --- END ---
     const currentUser = useAuthStore((state) => state.user);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+
+    // --- START: 2. สร้างตัวแปรที่คงที่ (Stable Dependency) ด้วย useMemo ---
+    // นี่คือการแก้ไข Bug: เราใช้ useMemo เพื่อป้องกันการสร้าง Object { status: "All" } ใหม่ทุกครั้งที่ re-render
+    // ซึ่งจะหยุดการเกิด Infinite Loop ใน usePaginatedFetch
+    const stableDefaultFilters = useMemo(() => ({ status: "All" }), []);
+    // --- END ---
 
     const { 
         data: sales, 
@@ -80,12 +81,13 @@ export default function SalePage() {
         handlePageChange, 
         handleItemsPerPageChange,
         handleFilterChange
-    } = usePaginatedFetch("/sales", 10, { status: "All" });
+    // --- START: 3. ส่งตัวแปรที่คงที่ (stableDefaultFilters) เข้าไปใน Hook แทน Object ที่สร้างใหม่ ---
+    } = usePaginatedFetch("/sales", 10, stableDefaultFilters);
+    // --- END ---
 
     return (
         <Card>
             <CardHeader>
-                {/* --- START: 2. ปรับปรุง CardHeader --- */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
                         <CardTitle className="flex items-center gap-2">
@@ -100,7 +102,6 @@ export default function SalePage() {
                         </Button>
                     )}
                 </div>
-                {/* --- END --- */}
             </CardHeader>
             <CardContent>
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -121,7 +122,6 @@ export default function SalePage() {
                         </SelectContent>
                     </Select>
                 </div>
-                {/* --- START: 3. เพิ่ม Div ครอบ Table และปรับปรุง Header --- */}
                 <div className="border rounded-md">
                     <Table>
                         <TableHeader>
@@ -150,9 +150,7 @@ export default function SalePage() {
                                 <TableRow key={sale.id}>
                                     <TableCell>#{sale.id}</TableCell>
                                     <TableCell>{sale.customer?.name || 'N/A'}</TableCell>
-                                    {/* --- START: 4. อัปเดตรูปแบบวันที่ --- */}
                                     <TableCell>{formatDateByLocale(sale.saleDate, i18n.language)}</TableCell>
-                                    {/* --- END --- */}
                                     <TableCell className="text-center">
                                         <StatusBadge 
                                             status={sale.status} 
@@ -173,7 +171,6 @@ export default function SalePage() {
                         </TableBody>
                     </Table>
                 </div>
-                {/* --- END --- */}
             </CardContent>
              <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
                  <div className="flex items-center gap-2 text-sm text-muted-foreground">

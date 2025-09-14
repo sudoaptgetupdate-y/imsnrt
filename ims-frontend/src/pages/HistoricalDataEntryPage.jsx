@@ -15,8 +15,10 @@ import { CustomerCombobox } from "@/components/ui/CustomerCombobox";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
 import { Trash2, BookUp } from "lucide-react";
-// --- 1. Import คอมโพเนนต์ที่ถูกต้อง ---
 import { DatePickerWithCustomCaption } from "@/components/ui/DatePickerWithCustomCaption";
+// --- START: 1. Import Textarea ---
+import { Textarea } from "@/components/ui/textarea";
+// --- END ---
 
 const HistoricalDataEntryPage = () => {
     const { t } = useTranslation();
@@ -35,16 +37,17 @@ const HistoricalDataEntryPage = () => {
         supplier: null,
         serialNumber: '',
         macAddress: '',
+        // --- START: 2. เพิ่ม notes ใน state เริ่มต้น ---
+        notes: '',
+        // --- END ---
         isSerialRequired: false,
         isMacRequired: false,
     });
 
-    // --- START: เพิ่มฟังก์ชันนี้เพื่ออัปเดต State ทั้งสอง ---
     const handleCreatedAtChange = (newDate) => {
-        setCreatedAt(newDate);
-        setSaleDate(newDate); // อัปเดต Sale Date ให้เป็นวันเดียวกับ Creation Date
+        setCreatedAt(newDate); 
+        setSaleDate(newDate); 
     };
-    // --- END ---
 
     const formatMacAddress = (value) => {
         const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
@@ -83,7 +86,8 @@ const HistoricalDataEntryPage = () => {
                 isSerialRequired: false,
                 isMacRequired: false,
                 serialNumber: '',
-                macAddress: ''
+                macAddress: '',
+                notes: '', // Reset notes ด้วย
             }));
         }
     };
@@ -130,13 +134,20 @@ const HistoricalDataEntryPage = () => {
             }
         }
 
-        setItems([...items, { ...currentItem, id: Date.now() }]);
+        // --- START: 3. เพิ่ม Logic สำหรับตรวจสอบและกำหนดค่า Notes เริ่มต้น ---
+        const noteToAdd = currentItem.notes.trim() === ''
+            ? "นำเข้าจากข้อมูลเก่าจากexcelพี่รูญ" // นี่คือข้อความอัตโนมัติตามที่คุณต้องการ
+            : currentItem.notes;
+
+        setItems([...items, { ...currentItem, notes: noteToAdd, id: Date.now() }]);
         
         setCurrentItem(prev => ({
             ...prev,
             serialNumber: '',
             macAddress: '',
+            notes: '', // รีเซ็ตช่อง notes ให้ว่าง
         }));
+        // --- END ---
 
         serialNumberInputRef.current?.focus();
     };
@@ -163,6 +174,7 @@ const HistoricalDataEntryPage = () => {
         }
 
         try {
+            // --- START: 4. เพิ่ม 'notes' เข้าไปใน Payload ที่ส่งไป Backend ---
             const inventoryPayload = {
                 createdAt: createdAt.toISOString(),
                 items: items.map(item => ({
@@ -170,8 +182,11 @@ const HistoricalDataEntryPage = () => {
                     supplierId: item.supplierId,
                     serialNumber: item.serialNumber,
                     macAddress: item.macAddress ? item.macAddress.replace(/[:-\s]/g, '') : '',
+                    notes: item.notes, // เพิ่ม field นี้
                 })),
             };
+            // --- END ---
+
             const inventoryResponse = await axiosInstance.post('/inventory/historical', inventoryPayload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -211,9 +226,7 @@ const HistoricalDataEntryPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label htmlFor="createdAt">{t('historical_item_creation_date')} *</Label>
-                        {/* --- START: แก้ไข onChange ที่นี่ --- */}
                         <DatePickerWithCustomCaption value={createdAt} onChange={handleCreatedAtChange} />
-                        {/* --- END --- */}
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="saleDate">{t('historical_sale_date')} *</Label>
@@ -279,6 +292,19 @@ const HistoricalDataEntryPage = () => {
                             />
                         </div>
                      </div>
+                     {/* --- START: 5. เพิ่มช่อง Textarea สำหรับ Notes --- */}
+                     <div className="space-y-2">
+                        <Label htmlFor="notes">{t('notes_label')} <span className="text-xs text-slate-500 ml-2">(หากเว้นว่าง ระบบจะใส่ "ข้อมูลนำเข้าย้อนหลัง")</span></Label>
+                        <Textarea
+                            id="notes"
+                            value={currentItem.notes}
+                            onChange={e => setCurrentItem(prev => ({...prev, notes: e.target.value}))}
+                            disabled={!currentItem.productModel}
+                            placeholder="Add optional notes..."
+                            rows={2}
+                        />
+                     </div>
+                     {/* --- END --- */}
                      <Button onClick={handleAddItem} disabled={!currentItem.productModel}>{t('historical_add_item_button')}</Button>
                 </div>
                 
@@ -291,6 +317,9 @@ const HistoricalDataEntryPage = () => {
                                     <p className="font-medium">{item.productModel.modelNumber}</p>
                                     <p className="text-sm text-muted-foreground">S/N: {item.serialNumber}</p>
                                     {item.macAddress && <p className="text-xs text-muted-foreground">MAC: {item.macAddress}</p>}
+                                    {/* --- START: 6. แสดงผล Notes ที่เพิ่มเข้าไป --- */}
+                                    {item.notes && <p className="text-xs text-muted-foreground italic">Note: {item.notes}</p>}
+                                    {/* --- END --- */}
                                 </div>
                                 <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(item.id)}>
                                     <Trash2 className="h-4 w-4 text-red-500"/>
