@@ -3,14 +3,19 @@ const prisma = require('../prisma/client');
 const { EventType } = require('@prisma/client');
 const borrowingController = {};
 
-// Helper function to create event logs consistently
-const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
+// --- START: MODIFIED HELPER ---
+// 1. ปรับปรุง createEventLog ให้รับ timestamp (เหมือนใน saleController)
+const createEventLog = (tx, inventoryItemId, userId, eventType, details, timestamp = new Date()) => {
+// --- END: MODIFIED HELPER ---
     return tx.eventLog.create({
         data: {
             inventoryItemId,
             userId,
             eventType,
             details,
+            // --- START: ADDED ---
+            createdAt: timestamp, // ใช้วันที่ที่ส่งเข้ามา
+            // --- END: ADDED ---
         },
     });
 };
@@ -111,7 +116,109 @@ borrowingController.createBorrowing = async (req, res, next) => {
     }
 };
 
-// ... ส่วนที่เหลือของไฟล์ไม่ต้องแก้ไข ...
+// --- START: ADDED NEW FUNCTION ---
+// 2. เพิ่มฟังก์ชัน createHistoricalBorrowing
+borrowingController.createHistoricalBorrowing = async (req, res, next) => {
+    const { customerId, inventoryItemIds, dueDate, notes, borrowDate } = req.body;
+    const approvedById = req.user.id;
+
+    if (!borrowDate || isNaN(new Date(borrowDate).getTime())) {
+        const err = new Error('A valid borrow date (borrowDate) is required.');
+        err.statusCode = 400;
+        return next(err);
+    }
+
+    const parsedCustomerId = parseInt(customerId, 10);
+    if (isNaN(parsedCustomerId)) {
+        const err = new Error('Customer ID must be a valid number.');
+        err.statusCode = 400;
+        return next(err);
+    }
+    
+    if (!Array.isArray(inventoryItemIds) || inventoryItemIds.length === 0 || inventoryItemIds.some(id => typeof id !== 'number')) {
+        const err = new Error('inventoryItemIds must be a non-empty array of numbers.');
+        err.statusCode = 400;
+        return next(err);
+    }
+    if (dueDate && isNaN(Date.parse(dueDate))) {
+        const err = new Error('Invalid due date format.');
+        err.statusCode = 400;
+        return next(err);
+    }
+
+    try {
+        const newBorrowing = await prisma.$transaction(async (tx) => {
+            
+            const itemsToBorrow = await tx.inventoryItem.findMany({
+                where: { id: { in: inventoryItemIds }, status: 'IN_STOCK' }
+            });
+
+            if (itemsToBorrow.length !== inventoryItemIds.length) {
+                const err = new Error('One or more items are not available or not found (Ensure they were created first).');
+                err.statusCode = 400;
+                throw err;
+            }
+            
+            const customer = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
+             if (!customer) {
+                const err = new Error('Customer not found.');
+                err.statusCode = 404;
+                throw err;
+            }
+
+            const historicalDate = new Date(borrowDate);
+
+            const createdBorrowing = await tx.borrowing.create({
+                data: {
+                    customerId: parsedCustomerId,
+                    approvedById,
+                    dueDate: dueDate ? new Date(dueDate) : null,
+                    notes,
+                    status: 'BORROWED',
+                    borrowDate: historicalDate, // ใช้วันที่ย้อนหลัง
+                    createdAt: historicalDate, // ตั้งค่า createdAt เป็นวันที่ย้อนหลัง
+                },
+            });
+            
+            await tx.borrowingOnItems.createMany({
+                data: inventoryItemIds.map(itemId => ({
+                    borrowingId: createdBorrowing.id,
+                    inventoryItemId: itemId,
+                    assignedAt: historicalDate, // ใช้วันที่ย้อนหลัง
+                })),
+            });
+            
+            await tx.inventoryItem.updateMany({
+                where: { id: { in: inventoryItemIds } },
+                data: { status: 'BORROWED' },
+            });
+
+            for (const itemId of inventoryItemIds) {
+                await createEventLog(
+                    tx,
+                    itemId,
+                    approvedById,
+                    EventType.BORROW,
+                    {
+                        customerName: customer.name,
+                        borrowingId: createdBorrowing.id,
+                        details: `Item borrowed by ${customer.name} (Historical Entry).`
+                    },
+                    historicalDate // ส่งวันที่ย้อนหลังเข้าไปใน Event Log
+                );
+            }
+
+            return createdBorrowing;
+        });
+
+        res.status(201).json(newBorrowing);
+
+    } catch (error) {
+        next(error);
+    }
+};
+// --- END: ADDED NEW FUNCTION ---
+
 
 borrowingController.returnItems = async (req, res, next) => {
     const { borrowingId } = req.params;
