@@ -11,11 +11,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Package } from "lucide-react";
 import { useTranslation } from "react-i18next";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
+
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
 
 export default function CustomerReturnedHistoryPage() {
     const { id: customerId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: 3. แก้ไข Hook เพื่อดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     const [items, setItems] = useState([]);
     const [customerName, setCustomerName] = useState('');
@@ -102,7 +126,9 @@ export default function CustomerReturnedHistoryPage() {
                                         <td className="p-2">{item.productModel?.brand?.name || 'N/A'}</td>
                                         <td className="p-2">{item.productModel?.modelNumber || 'N/A'}</td>
                                         <td className="p-2">{item.serialNumber || 'N/A'}</td>
-                                        <td className="p-2">{item.returnDate ? new Date(item.returnDate).toLocaleDateString() : 'N/A'}</td>
+                                        {/* --- START: 4. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ในตาราง) --- */}
+                                        <td className="p-2">{formatDateByLocale(item.returnDate, i18n.language)}</td>
+                                        {/* --- END --- */}
                                         <td className="p-2">
                                             <Button variant="link" asChild className="p-0 h-auto">
                                                 <Link to={`/borrowings/${item.transactionId}`}>

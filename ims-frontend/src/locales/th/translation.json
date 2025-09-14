@@ -636,5 +636,19 @@
   "no_items_added_yet": "ยังไม่มีรายการ",
   "pick_a_date": "เลือกวันที่",
   "due_date_label": "กำหนดคืน",
-  "inventory_archive_menu": "คลังสินค้าทั้งหมด"
+  "inventory_archive_menu": "คลังสินค้าทั้งหมด",
+  "loading_active_borrowings": "กำลังโหลดรายการที่ยืมอยู่...",
+  "active_borrowings_title": "รายการที่กำลังยืม",
+  "active_borrowings_description": "สำหรับลูกค้า: {{name}}",
+  "back_to_summary_button": "กลับไปหน้าสรุป",
+  "active_borrowings_all_items_title": "รายการที่ยืมทั้งหมด ({{count}})",
+  "active_borrowings_description_detail": "เลือกรายการที่จะคืน คุณสามารถคืนสินค้าจากหลายใบยืมได้ในครั้งเดียว",
+  "tableHeader_return": "คืน",
+  "tableHeader_from_borrowing_id": "จากใบยืม ID",
+  "active_borrowings_none": "ลูกค้ารายนี้ไม่มียอดค้างยืม",
+  "active_borrowings_confirm_button": "ยืนยันการคืน ({{count}} รายการ)",
+  "active_borrowings_dialog_title": "ยืนยันการคืนสินค้า",
+  "error_fetch_active_borrowings": "ไม่สามารถดึงข้อมูลการยืมได้",
+  "success_items_returned": "รับคืนสินค้า {{count}} รายการเรียบร้อยแล้ว",
+  "error_returning_items": "เกิดข้อผิดพลาดระหว่างการรับคืนสินค้า"
 }

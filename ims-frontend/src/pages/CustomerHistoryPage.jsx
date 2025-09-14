@@ -13,6 +13,10 @@ import { ArrowLeft, ShoppingCart, PackageOpen, Package, Users } from "lucide-rea
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslation } from "react-i18next";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+// --- START: 1. เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
+import { format } from "date-fns";
+import { th } from "date-fns/locale";
+// --- END ---
 
 const StatCard = ({ title, value, icon, description, onClick }) => (
     <Card onClick={onClick} className={onClick ? "cursor-pointer hover:border-primary transition-colors" : ""}>
@@ -27,10 +31,30 @@ const StatCard = ({ title, value, icon, description, onClick }) => (
     </Card>
 );
 
+// --- START: 2. เพิ่มฟังก์ชันจัดรูปแบบวันที่ (ส่วนกลางไฟล์) ---
+const formatDateByLocale = (dateString, localeCode) => {
+    if (!dateString) return 'N/A'; // ป้องกัน error ถ้าวันที่เป็น null
+    try {
+        const date = new Date(dateString);
+        if (localeCode.startsWith('th')) {
+            // TH: DD/MM/BBBB (Buddhist Year)
+            const buddhistYear = date.getFullYear() + 543;
+            return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
+        }
+        // EN: DD/MM/YYYY (Christian Year)
+        return format(date, 'dd/MM/yyyy');
+    } catch (error) {
+        return "Invalid Date";
+    }
+};
+// --- END ---
+
 export default function CustomerHistoryPage() {
     const { id: customerId } = useParams();
     const navigate = useNavigate();
-    const { t } = useTranslation();
+    // --- START: 3. แก้ไข Hook เพื่อดึง i18n มาใช้งาน ---
+    const { t, i18n } = useTranslation();
+    // --- END ---
     const token = useAuthStore((state) => state.token);
     
     const [history, setHistory] = useState([]);
@@ -155,15 +179,19 @@ export default function CustomerHistoryPage() {
                                             <td className="p-2 text-center">
                                                 <StatusBadge status={item.type === 'SALE' ? item.details.status : item.type} className="w-20" />
                                             </td>
-                                            <td className="p-2 text-left whitespace-nowrap">{new Date(item.date).toLocaleString()}</td>
+                                            {/* --- START: 4. ใช้งานวันที่ที่จัดรูปแบบแล้ว (Main Date) --- */}
+                                            <td className="p-2 text-left whitespace-nowrap">{formatDateByLocale(item.date, i18n.language)}</td>
+                                            {/* --- END --- */}
                                             <td className="p-2 text-center">{item.itemCount}</td>
                                             <td className="p-2 text-right">
+                                                {/* --- START: 5. ใช้งานวันที่ที่จัดรูปแบบแล้ว (Conditional Dates) --- */}
                                                 {item.type === 'SALE' 
                                                     ? `${t('tableHeader_total')}: ${item.details.total.toLocaleString('en-US')} THB`
                                                     : item.details.status === 'RETURNED' 
-                                                        ? `${t('status_returned')}: ${new Date(item.details.returnDate).toLocaleDateString()}`
-                                                        : `${t('tableHeader_dueDate')}: ${item.details.dueDate ? new Date(item.details.dueDate).toLocaleDateString() : '-'}`
+                                                        ? `${t('status_returned')}: ${formatDateByLocale(item.details.returnDate, i18n.language)}`
+                                                        : `${t('tableHeader_dueDate')}: ${item.details.dueDate ? formatDateByLocale(item.details.dueDate, i18n.language) : '-'}`
                                                 }
+                                                {/* --- END --- */}
                                             </td>
                                             <td className="p-2 text-center">
                                                 <Button 

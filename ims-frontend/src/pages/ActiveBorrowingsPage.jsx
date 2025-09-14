@@ -57,7 +57,9 @@ export default function ActiveBorrowingsPage() {
             setAllItems(flattenedItems);
             setCustomer(customerRes.data);
         } catch (error) {
-            toast.error("Failed to fetch data.");
+            // --- START: TRANSLATED ---
+            toast.error(t('error_fetch_active_borrowings'));
+            // --- END ---
         } finally {
             setLoading(false);
         }
@@ -65,7 +67,7 @@ export default function ActiveBorrowingsPage() {
 
     useEffect(() => {
         fetchData();
-    }, [customerId, token]);
+    }, [customerId, token, t]); // <-- เพิ่ม t เข้าไปใน dependency array
 
     const handleToggleReturnItem = (itemId) => {
         setSelectedToReturn(prev =>
@@ -76,7 +78,6 @@ export default function ActiveBorrowingsPage() {
     const handleReturnSelectedItems = async () => {
         if (selectedToReturn.length === 0) {
             toast.error("Please select at least one item to return.");
-            return;
         }
 
         const itemsByBorrowing = selectedToReturn.reduce((acc, itemId) => {
@@ -100,15 +101,17 @@ export default function ActiveBorrowingsPage() {
 
         try {
             await Promise.all(returnPromises);
-            toast.success(`${selectedToReturn.length} item(s) have been returned successfully.`);
+            toast.success(t('success_items_returned', { count: selectedToReturn.length })); // --- TRANSLATED ---
             fetchData();
             setSelectedToReturn([]);
         } catch (error) {
-            toast.error("An error occurred while returning items.");
+            toast.error(t('error_returning_items')); // --- TRANSLATED ---
         }
     };
 
-    if (loading) return <p>Loading active borrowings...</p>;
+    // --- START: TRANSLATED ---
+    if (loading) return <p>{t('loading_active_borrowings')}</p>;
+    // --- END ---
 
     // --- START: 3. เพิ่ม Logic สำหรับคำนวณและแบ่งหน้าข้อมูล ---
     const totalPages = Math.ceil(allItems.length / itemsPerPage);
@@ -135,32 +138,38 @@ export default function ActiveBorrowingsPage() {
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <PackageOpen className="h-6 w-6" />
-                        Active Borrowed Items
+                        {/* --- START: TRANSLATED --- */}
+                        {t('active_borrowings_title')}
                     </h1>
-                    <p className="text-muted-foreground mt-1">For Customer: {customer?.name || '...'}</p>
+                    <p className="text-muted-foreground mt-1">{t('active_borrowings_description', { name: customer?.name || '...' })}</p>
                 </div>
                 <Button variant="outline" onClick={() => navigate(`/customers/${customerId}/history`, { state: { defaultTab: 'summary' } })}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Summary
+                    {t('back_to_summary_button')}
+                    {/* --- END --- */}
                 </Button>
             </div>
             
             <Card>
                 <CardHeader>
-                    <CardTitle>All Borrowed Items ({allItems.length})</CardTitle>
+                    {/* --- START: TRANSLATED --- */}
+                    <CardTitle>{t('active_borrowings_all_items_title', { count: allItems.length })}</CardTitle>
                     <CardDescription>
-                        Select items to return. You can return items from different borrowing records at the same time.
+                        {t('active_borrowings_description_detail')}
                     </CardDescription>
+                     {/* --- END --- */}
                 </CardHeader>
                 <CardContent>
                     <div className="border rounded-md">
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/50 hover:bg-muted/50">
-                                    <th className="p-2 w-12 text-center">Return</th>
-                                    <th className="p-2 text-left">Product</th>
-                                    <th className="p-2 text-left">Serial Number</th>
-                                    <th className="p-2 text-left">From Borrowing ID</th>
+                                    {/* --- START: TRANSLATED --- */}
+                                    <th className="p-2 w-12 text-center">{t('tableHeader_return')}</th>
+                                    <th className="p-2 text-left">{t('tableHeader_product')}</th>
+                                    <th className="p-2 text-left">{t('tableHeader_serialNumber')}</th>
+                                    <th className="p-2 text-left">{t('tableHeader_from_borrowing_id')}</th>
+                                    {/* --- END --- */}
                                 </tr>
                             </thead>
                             <tbody>
@@ -186,7 +195,9 @@ export default function ActiveBorrowingsPage() {
                                 ) : (
                                     <tr>
                                         <td colSpan="4" className="p-4 text-center text-muted-foreground">
-                                            This customer has no active borrowings.
+                                            {/* --- START: TRANSLATED --- */}
+                                            {t('active_borrowings_none')}
+                                            {/* --- END --- */}
                                         </td>
                                     </tr>
                                 )}
@@ -201,21 +212,26 @@ export default function ActiveBorrowingsPage() {
                         <div className="flex-1">
                             <AlertDialog>
                                 <AlertDialogTrigger asChild>
+                                     {/* --- START: TRANSLATED --- */}
                                     <Button disabled={selectedToReturn.length === 0}>
-                                        Confirm Return ({selectedToReturn.length} items)
+                                        {t('active_borrowings_confirm_button', { count: selectedToReturn.length })}
                                     </Button>
+                                     {/* --- END --- */}
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                     <AlertDialogHeader>
-                                        <AlertDialogTitle>Confirm Return</AlertDialogTitle>
+                                        {/* --- START: TRANSLATED --- */}
+                                        <AlertDialogTitle>{t('active_borrowings_dialog_title')}</AlertDialogTitle>
                                         <AlertDialogDescription>
-                                            You are about to return {selectedToReturn.length} item(s). This will change their status back to "IN_STOCK". Are you sure?
+                                            {/* (ใช้คีย์เดิมที่มีอยู่) */}
+                                            {t('dialog_confirm_return_borrow_description', { count: selectedToReturn.length })}
                                         </AlertDialogDescription>
+                                        {/* --- END --- */}
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                                         <AlertDialogAction onClick={handleReturnSelectedItems}>
-                                            Continue
+                                            {t('continue')}
                                         </AlertDialogAction>
                                     </AlertDialogFooter>
                                 </AlertDialogContent>

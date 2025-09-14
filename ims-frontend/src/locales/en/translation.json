@@ -636,5 +636,19 @@
   "no_items_added_yet": "No items added yet.",
   "pick_a_date": "Pick a date",
   "due_date_label": "Due Date",
-  "inventory_archive_menu": "Inventory Archive"
+  "inventory_archive_menu": "Inventory Archive",
+  "loading_active_borrowings": "Loading active borrowings...",
+  "active_borrowings_title": "Active Borrowed Items",
+  "active_borrowings_description": "For Customer: {{name}}",
+  "back_to_summary_button": "Back to Summary",
+  "active_borrowings_all_items_title": "All Borrowed Items ({{count}})",
+  "active_borrowings_description_detail": "Select items to return. You can return items from different borrowing records at the same time.",
+  "tableHeader_return": "Return",
+  "tableHeader_from_borrowing_id": "From Borrowing ID",
+  "active_borrowings_none": "This customer has no active borrowings.",
+  "active_borrowings_confirm_button": "Confirm Return ({{count}} items)",
+  "active_borrowings_dialog_title": "Confirm Return",
+  "error_fetch_active_borrowings": "Failed to fetch active borrowings.",
+  "success_items_returned": "{{count}} item(s) have been returned successfully.",
+  "error_returning_items": "An error occurred while returning items."
 }
