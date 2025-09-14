@@ -121,6 +121,21 @@ saleController.getAllSales = async (req, res, next) => {
         const statusFilter = req.query.status || 'All'; 
         const skip = (page - 1) * limit;
 
+        // --- START: เพิ่มโค้ดส่วนนี้ ---
+        const sortBy = req.query.sortBy || 'saleDate'; // ค่าเริ่มต้นเป็น saleDate
+        const sortOrder = req.query.sortOrder || 'desc'; // ค่าเริ่มต้นเป็น desc
+
+        // Logic สำหรับสร้าง object orderBy แบบไดนามิก
+        let orderBy = {};
+        if (sortBy === 'customer') {
+            // กรณีพิเศษ: ถ้าต้องการเรียงตามชื่อลูกค้า (ซึ่งเป็น relation)
+            orderBy = { customer: { name: sortOrder } };
+        } else {
+            // กรณีทั่วไป: เรียงตาม field ใน Model Sale (เช่น id, saleDate, total)
+            orderBy = { [sortBy]: sortOrder };
+        }
+        // --- END: จบส่วนที่เพิ่ม ---
+
         const whereConditions = [];
 
         if (statusFilter && statusFilter !== 'All') {
@@ -143,7 +158,8 @@ saleController.getAllSales = async (req, res, next) => {
                 where,
                 skip,
                 take: limit,
-                orderBy: { saleDate: 'desc' },
+                // orderBy: { saleDate: 'desc' }, // <--- ลบ/แก้ไขบรรทัดนี้
+                orderBy: orderBy, // <--- ใช้ object ใหม่ที่เราสร้าง
                 include: {
                     customer: true,
                     soldBy: { select: { id: true, name: true } },
