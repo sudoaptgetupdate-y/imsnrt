@@ -236,7 +236,7 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                             <Label>{t('suppliers')} <span className="text-red-500">*</span></Label>
                             <SupplierCombobox
                                 selectedValue={selectedSupplierId}
-                                onSelect={(value) => setSelectedSupplierId(value)}
+                                onSelect={(supplierObject) => setSelectedSupplierId(supplierObject ? String(supplierObject.id) : "")}
                             />
                         </div>
                     </div>
