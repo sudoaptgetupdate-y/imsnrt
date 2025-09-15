@@ -1,182 +1,251 @@
-// src/pages/CreateAssetPage.jsx
-
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import axiosInstance from '@/api/axiosInstance';
-import useAuthStore from "@/store/authStore";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
-import { ArrowLeft, PackagePlus } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { Textarea } from "@/components/ui/textarea"; 
-import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
-
+import { SupplierCombobox } from "@/components/ui/SupplierCombobox"; // --- (1. Import) ---
+import { toast } from 'sonner';
+import axiosInstance from '@/api/axiosInstance';
+import useAuthStore from '@/store/authStore';
+import { useTranslation } from 'react-i18next';
+import { ChevronLeft } from 'lucide-react';
 
 const formatMacAddress = (value) => {
-  const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-  if (cleaned.length === 0) return '';
-  return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || '';
+    const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+    if (cleaned.length === 0) return '';
+    return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || cleaned;
 };
 
 const validateMacAddress = (mac) => {
-  if (!mac) return true; // Optional field can be empty
   const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
   return macRegex.test(mac);
 };
 
-const initialFormData = {
-    assetCode: "",
-    serialNumber: "",
-    macAddress: "",
-    productModelId: "",
-    supplierId: "",
-    notes: "",
-};
 
 export default function CreateAssetPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
-    const [formData, setFormData] = useState(initialFormData);
     
-    const [selectedModelInfo, setSelectedModelInfo] = useState(null);
-    const [isMacRequired, setIsMacRequired] = useState(true);
-    const [isSerialRequired, setIsSerialRequired] = useState(true);
+    // --- START: PHASE 5 (2. เพิ่ม purchasePrice ใน state) ---
+    const [formData, setFormData] = useState({
+        assetCode: '',
+        serialNumber: '',
+        macAddress: '',
+        notes: '',
+        purchasePrice: '' 
+    });
+    // --- END: PHASE 5 ---
+    
+    const [selectedModel, setSelectedModel] = useState(null);
+    const [selectedSupplierId, setSelectedSupplierId] = useState(null); // --- (3. เพิ่ม SupplierId) ---
+    
+    const [isLoading, setIsLoading] = useState(false);
+    const [categoryInfo, setCategoryInfo] = useState({
+        name: '',
+        requiresSerialNumber: false,
+        requiresMacAddress: false
+    });
 
-    const handleInputChange = (e) => {
-        const { id, value } = e.target;
-        if (id === 'serialNumber' || id === 'assetCode') {
-            setFormData({ ...formData, [id]: value.toUpperCase() });
+    useEffect(() => {
+        if (selectedModel) {
+            setCategoryInfo({
+                name: selectedModel.category.name,
+                requiresSerialNumber: selectedModel.category.requiresSerialNumber,
+                requiresMacAddress: selectedModel.category.requiresMacAddress
+            });
         } else {
-            setFormData({ ...formData, [id]: value });
+            setCategoryInfo({
+                name: '',
+                requiresSerialNumber: false,
+                requiresMacAddress: false
+            });
         }
+    }, [selectedModel]);
+
+    const handleChange = (e) => {
+        const { id, value } = e.target;
+        let processedValue = value;
+        if (id === 'macAddress') {
+            processedValue = formatMacAddress(value);
+        } else if (id !== 'notes') {
+            processedValue = value.toUpperCase();
+        }
+        
+        setFormData(prev => ({ ...prev, [id]: processedValue }));
     };
 
-    const handleMacAddressChange = (e) => {
-        const formatted = formatMacAddress(e.target.value);
-        setFormData({ ...formData, macAddress: formatted });
-    };
-
-    const handleModelSelect = (model) => {
-        if (model) {
-            setFormData(prev => ({ ...prev, productModelId: model.id }));
-            setSelectedModelInfo(model);
-            setIsMacRequired(model.category.requiresMacAddress);
-            setIsSerialRequired(model.category.requiresSerialNumber);
-             if (!model.category.requiresMacAddress) setFormData(prev => ({ ...prev, macAddress: '' }));
-             if (!model.category.requiresSerialNumber) setFormData(prev => ({ ...prev, serialNumber: '' }));
-        }
-    };
-    
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (formData.macAddress && !validateMacAddress(formData.macAddress)) {
-            toast.error(t('error_invalid_mac'));
-            return;
-        }
+        setIsLoading(true);
 
-        if (isMacRequired && !formData.macAddress) {
-            toast.error("MAC Address is required for this product category.");
-            return;
-        }
+        const { assetCode, serialNumber, macAddress, notes, purchasePrice } = formData;
 
-        if (!formData.productModelId) {
+        if (!selectedModel) {
             toast.error(t('error_select_model'));
-            return;
-        }
-        if (!formData.assetCode) {
-            toast.error(t('error_asset_code_required'));
+            setIsLoading(false);
             return;
         }
         
-        const payload = {
-            ...formData,
-            macAddress: formData.macAddress ? formData.macAddress.replace(/[:-\s]/g, '') : null,
-        };
+        // --- START: PHASE 5 (4. เพิ่มการตรวจสอบ Supplier) ---
+        if (!selectedSupplierId) {
+            toast.error(t('error_select_supplier'));
+            setIsLoading(false);
+            return;
+        }
+        // --- END: PHASE 5 ---
 
+        if (!assetCode.trim()) {
+            toast.error(t('error_asset_code_required'));
+            setIsLoading(false);
+            return;
+        }
+
+        const { requiresSerialNumber, requiresMacAddress } = categoryInfo;
+        if (requiresSerialNumber && !serialNumber.trim()) {
+            toast.error(t('error_serial_required_category'));
+            setIsLoading(false);
+            return;
+        }
+        if (requiresMacAddress && !macAddress.trim()) {
+            toast.error(t('error_mac_required_category'));
+            setIsLoading(false);
+            return;
+        }
+        if (macAddress && !validateMacAddress(macAddress.trim())) {
+            toast.error(t('error_invalid_mac'));
+            setIsLoading(false);
+            return;
+        }
+        
+        // --- START: PHASE 5 (5. ตรวจสอบ purchasePrice) ---
+        const parsedPurchasePrice = parseFloat(purchasePrice);
+        if (purchasePrice !== '' && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
+            toast.error("Purchase Price must be a valid non-negative number.");
+            setIsLoading(false);
+            return;
+        }
+        // --- END: PHASE 5 ---
+        
         try {
-            await axiosInstance.post("/assets", payload, { 
-                headers: { Authorization: `Bearer ${token}` } 
+            // --- START: PHASE 5 (6. เพิ่ม purchasePrice และ supplierId ใน payload) ---
+            const payload = {
+                productModelId: selectedModel.id,
+                supplierId: parseInt(selectedSupplierId),
+                assetCode: assetCode.trim(),
+                serialNumber: serialNumber.trim() || null,
+                macAddress: macAddress.trim() || null,
+                notes: notes.trim() || null,
+                purchasePrice: purchasePrice ? parsedPurchasePrice : null
+            };
+            // --- END: PHASE 5 ---
+
+            await axiosInstance.post('/assets', payload, {
+                headers: { Authorization: `Bearer ${token}` }
             });
-            toast.success(`Asset has been added to the warehouse successfully!`);
-            navigate("/assets");
+
+            toast.success(`Asset ${assetCode} has been created successfully!`);
+            navigate('/assets/list');
+
         } catch (error) {
-            toast.error(error.response?.data?.error || `Failed to add asset.`);
+            toast.error(error.response?.data?.error || "Failed to create asset.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
+
     return (
-        <div className="max-w-2xl mx-auto">
-             <Button variant="outline" onClick={() => navigate(-1)} className="mb-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
+        <div className="container mx-auto p-4 max-w-2xl">
+            <Button variant="outline" size="sm" onClick={() => navigate('/assets/list')} className="mb-4">
+                <ChevronLeft className="mr-2 h-4 w-4" />
                 {t('create_asset_back_button')}
             </Button>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <PackagePlus className="h-6 w-6" />
-                        {t('create_asset_title')}
-                    </CardTitle>
-                    <CardDescription className="mt-1">{t('create_asset_description')}</CardDescription>
-                </CardHeader>
-                <form onSubmit={handleSubmit}>
-                    <CardContent className="space-y-4">
+            <form onSubmit={handleSubmit}>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{t('create_asset_title')}</CardTitle>
+                        <CardDescription>{t('create_asset_description')}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>{t('product_model_label')} <span className="text-red-500">{t('required_field')}</span></Label>
-                                <ProductModelCombobox onSelect={handleModelSelect} />
+                                <Label htmlFor="productModel">{t('product_model_label')} <span className="text-red-500">{t('required_field')}</span></Label>
+                                <ProductModelCombobox onSelect={setSelectedModel} />
                             </div>
                             <div className="space-y-2">
-                                <Label>{t('supplier_label')}</Label>
-                                <SupplierCombobox onSelect={(id) => setFormData(prev => ({ ...prev, supplierId: id }))} />
+                                <Label htmlFor="category">{t('category_label')}</Label>
+                                <Input id="category" value={categoryInfo.name} disabled readOnly />
                             </div>
                         </div>
-                        {selectedModelInfo && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>{t('category_label')}</Label><Input value={selectedModelInfo.category.name} disabled /></div>
-                                <div className="space-y-2"><Label>{t('brand_label')}</Label><Input value={selectedModelInfo.brand.name} disabled /></div>
-                            </div>
-                        )}
+
                         <div className="space-y-2">
                             <Label htmlFor="assetCode">{t('asset_code_label')} <span className="text-red-500">{t('required_field')}</span></Label>
-                            <Input id="assetCode" value={formData.assetCode} onChange={handleInputChange} required />
+                            <Input id="assetCode" value={formData.assetCode} onChange={handleChange} />
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="serialNumber">
+                                    {t('serial_number_label')}
+                                    {categoryInfo.requiresSerialNumber ? (
+                                        <span className="text-red-500 ml-1">{t('required_field')}</span>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs ml-1">{t('not_required_label')}</span>
+                                    )}
+                                </Label>
+                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleChange} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="macAddress">
+                                    {t('mac_address_label')}
+                                    {categoryInfo.requiresMacAddress ? (
+                                        <span className="text-red-500 ml-1">{t('required_field')}</span>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs ml-1">{t('not_required_label')}</span>
+                                    )}
+                                </Label>
+                                <Input id="macAddress" value={formData.macAddress} onChange={handleChange} placeholder={t('mac_address_placeholder')} />
+                            </div>
+                        </div>
+                        
+                        {/* --- START: PHASE 5 (7. เพิ่มช่องกรอก Supplier และ Purchase Price) --- */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="supplier">{t('supplier_label')} <span className="text-red-500">{t('required_field')}</span></Label>
+                                <SupplierCombobox
+                                    selectedValue={selectedSupplierId}
+                                    onSelect={(supplier) => setSelectedSupplierId(supplier ? String(supplier.id) : null)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="purchasePrice">Purchase Price (Cost) <span className="text-muted-foreground text-xs ml-1">{t('optional_label')}</span></Label>
+                                <Input 
+                                    id="purchasePrice" 
+                                    type="number"
+                                    placeholder="Enter cost price..."
+                                    value={formData.purchasePrice} 
+                                    onChange={handleChange} 
+                                />
+                            </div>
+                        </div>
+                        {/* --- END: PHASE 5 --- */}
+
                         <div className="space-y-2">
-                            <Label htmlFor="serialNumber">{t('serial_number_label')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                            <Input id="serialNumber" value={formData.serialNumber || ''} onChange={handleInputChange} required={isSerialRequired} />
+                            <Label htmlFor="notes">{t('notes_label')} <span className="text-muted-foreground text-xs ml-1">{t('optional_label')}</span></Label>
+                            <Input id="notes" value={formData.notes} onChange={handleChange} />
                         </div>
-                        <div className="space-y-2">
-                             <Label htmlFor="macAddress">{t('mac_address_label')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                             <Input 
-                                id="macAddress" 
-                                value={formData.macAddress} 
-                                onChange={handleMacAddressChange} 
-                                required={isMacRequired} 
-                                maxLength={17}
-                                placeholder={t('mac_address_placeholder')}
-                             />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">{t('notes')}</Label>
-                            <Textarea
-                                id="notes"
-                                value={formData.notes}
-                                onChange={handleInputChange}
-                                placeholder="Add any notes for this asset..."
-                                rows={3}
-                            />
-                        </div>
+
                     </CardContent>
                     <CardFooter>
-                        <Button type="submit">{t('add_asset_button')}</Button>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? t('saving') : t('add_asset_button')}
+                        </Button>
                     </CardFooter>
-                </form>
-            </Card>
+                </Card>
+            </form>
         </div>
     );
 }
-

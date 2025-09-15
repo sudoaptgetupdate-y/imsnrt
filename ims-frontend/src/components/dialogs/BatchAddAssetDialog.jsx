@@ -10,13 +10,11 @@ import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
 import { toast } from 'sonner';
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
-import { PlusCircle, XCircle, Download, Upload } from "lucide-react";
+import { PlusCircle, XCircle, Download, Upload, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Papa from 'papaparse';
 
-const MAX_ASSETS_MANUAL = 50; // Increased limit for import
-const FIELDS_PER_ROW = 4; // assetCode, serialNumber, macAddress, notes
-
+// (Helper functions formatMacAddress, validateMacAddress - คงเดิม)
 const formatMacAddress = (value) => {
     const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
     if (cleaned.length === 0) return '';
@@ -28,14 +26,41 @@ const validateMacAddress = (mac) => {
   return macRegex.test(mac);
 };
 
+// (ค่าคงที่ ที่เราแก้ไข Bug ครั้งก่อน)
+const MAX_ASSETS_MANUAL = 50; 
+const FIELDS_PER_ROW = 4; // assetCode, serialNumber, macAddress, notes
+
+// --- START: (1. เพิ่ม Helpers สำหรับฟอร์แมต Comma) ---
+const parseFormattedValue = (val) => String(val).replace(/,/g, '');
+
+const handlePriceChange = (e, setter) => {
+    const { value } = e.target;
+    const rawValue = parseFormattedValue(value);
+
+    if (rawValue === '' || /^[0-9]*\.?[0-9]*$/.test(rawValue)) {
+        const parts = rawValue.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        setter(parts.join('.'));
+    }
+};
+// --- END: (1. เพิ่ม Helpers) ---
+
+
 export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
     const { t } = useTranslation();
     const [selectedModel, setSelectedModel] = useState(null);
     const [selectedSupplierId, setSelectedSupplierId] = useState("");
+    
+    const [batchPurchasePrice, setBatchPurchasePrice] = useState("");
+    const [isCostLoading, setIsCostLoading] = useState(false);
+
+    const [masterSellingPrice, setMasterSellingPrice] = useState("");
+
     const [manualItems, setManualItems] = useState([{ assetCode: '', serialNumber: '', macAddress: '', notes: '' }]);
     const [isLoading, setIsLoading] = useState(false);
     const token = useAuthStore((state) => state.token);
 
+    // ... (Refs - คงเดิม) ...
     const inputRefs = useRef([]);
     const firstInputRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -48,10 +73,54 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         }
     }, [isOpen, selectedModel]);
 
+    // (Smart Cost useEffect - อัปเดตให้ใช้ toLocaleString เมื่อตั้งค่า)
+    useEffect(() => {
+        const fetchLastCost = async () => {
+            if (selectedModel?.id && selectedSupplierId) {
+                setIsCostLoading(true);
+                try {
+                    const response = await axiosInstance.get('/inventory/last-cost', {
+                        headers: { Authorization: `Bearer ${token}` },
+                        params: { 
+                            modelId: selectedModel.id, 
+                            supplierId: selectedSupplierId 
+                        }
+                    });
+                    // --- START: (2. ใช้ toLocaleString เพื่อฟอร์แมตค่าที่ดึงมา) ---
+                    if (response.data.lastCost !== null) {
+                        setBatchPurchasePrice(response.data.lastCost.toLocaleString('en-US'));
+                    } else {
+                        setBatchPurchasePrice("");
+                    }
+                    // --- END: (2. อัปเดต) ---
+                } catch (error) {
+                    toast.error("Failed to fetch last cost price.");
+                    setBatchPurchasePrice("");
+                } finally {
+                    setIsCostLoading(false);
+                }
+            }
+        };
+
+        fetchLastCost();
+    }, [selectedModel?.id, selectedSupplierId, token]);
+
     const handleModelSelect = (model) => {
         setSelectedModel(model);
+        setBatchPurchasePrice(""); // (Reset Smart Cost)
+        // --- START: (3. ใช้ toLocaleString เมื่อตั้งค่า Smart Price) ---
+        setMasterSellingPrice(model ? (model.sellingPrice !== null ? model.sellingPrice.toLocaleString('en-US') : "") : "");
+        // --- END: (3. อัปเดต) ---
     };
     
+    // ... (handleSupplierSelect - คงเดิม) ...
+    const handleSupplierSelect = (supplierObject) => {
+        const newId = supplierObject ? String(supplierObject.id) : "";
+        setSelectedSupplierId(newId);
+        setBatchPurchasePrice(""); // (Reset Smart Cost only)
+    };
+
+    // ... (Functions: handleInputChange, addManualItemRow, removeManualItemRow, handleKeyDown, handleDownloadTemplate, handleFileImport - คงเดิม) ...
     const handleInputChange = (e, index, field) => {
         const { value } = e.target;
         let processedValue = value;
@@ -177,6 +246,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         event.target.value = null; 
     };
 
+
     const handleSubmit = async () => {
         if (!selectedModel) {
             toast.error(t('error_select_model'));
@@ -186,8 +256,22 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
             toast.error(t('error_select_supplier'));
             return;
         }
+        
+        // --- START: (4. ใช้ parser ก่อน parseFloat) ---
+        const parsedPurchasePrice = parseFloat(parseFormattedValue(batchPurchasePrice));
+        if (batchPurchasePrice === "" || isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0) {
+             throw new Error("Purchase Price is required and must be a non-negative number.");
+        }
+        
+        const parsedSellingPrice = parseFloat(parseFormattedValue(masterSellingPrice));
+         if (masterSellingPrice === "" || isNaN(parsedSellingPrice) || parsedSellingPrice < 0) {
+             throw new Error("Master Selling Price is required and must be a non-negative number.");
+         }
+        // --- END: (4. อัปเดต) ---
+
         setIsLoading(true);
 
+        // ... (processItem loop - คงเดิม) ...
         let errorMessages = [];
         const { requiresSerialNumber, requiresMacAddress } = selectedModel.category;
 
@@ -237,10 +321,13 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
             return;
         }
 
+        // (Payload - คงเดิม / เพราะเราใช้ตัวแปรที่ parse แล้ว)
         const payload = {
             productModelId: selectedModel.id,
             supplierId: selectedSupplierId ? parseInt(selectedSupplierId) : null,
             items: itemsPayload,
+            purchasePrice: parsedPurchasePrice,
+            sellingPrice: parsedSellingPrice, 
         };
 
         try {
@@ -257,11 +344,14 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
         }
     };
     
+    // (handleClose - คงเดิม)
     const handleClose = () => {
         setIsOpen(false);
         setSelectedModel(null);
         setSelectedSupplierId("");
         setManualItems([{ assetCode: '', serialNumber: '', macAddress: '', notes: '' }]);
+        setBatchPurchasePrice("");
+        setMasterSellingPrice(""); 
     };
 
     const manualItemCount = manualItems.filter(i => i.assetCode?.trim()).length;
@@ -269,12 +359,14 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
             <DialogContent className="max-w-4xl">
+                {/* ... (Header - คงเดิม) ... */}
                 <DialogHeader>
                     <DialogTitle>{t('batch_add_asset_title')}</DialogTitle>
                     <DialogDescription>{t('batch_add_asset_description')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* ... (Comboboxes - คงเดิม) ... */}
                         <div className="space-y-2">
                             <Label>{t('product_model_label')} <span className="text-red-500">*</span></Label>
                             <ProductModelCombobox onSelect={handleModelSelect} />
@@ -283,10 +375,51 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                             <Label>{t('supplier_label')} <span className="text-red-500">*</span></Label>
                             <SupplierCombobox
                                 selectedValue={selectedSupplierId}
-                                onSelect={(supplierObject) => setSelectedSupplierId(supplierObject ? String(supplierObject.id) : "")}
+                                onSelect={handleSupplierSelect}
                             />
                         </div>
                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2 relative">
+                            <Label htmlFor="batchPurchasePrice">Purchase Price (Cost) per item <span className="text-red-500">*</span></Label>
+                            {/* --- START: (5. อัปเดต Input Field ของ Cost) --- */}
+                            <Input 
+                                id="batchPurchasePrice" 
+                                type="text"              // <-- เปลี่ยนเป็น text
+                                inputMode="decimal"     // <-- เพิ่ม inputMode
+                                placeholder="Enter cost price..." 
+                                value={batchPurchasePrice}
+                                onChange={(e) => handlePriceChange(e, setBatchPurchasePrice)} // <-- ใช้ handler ใหม่
+                                disabled={isCostLoading || !selectedModel || !selectedSupplierId}
+                            />
+                            {/* --- END: (5. อัปเดต) --- */}
+                            {isCostLoading && (
+                                <div className="absolute right-2 top-7">
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">Smart Cost: Auto-fills last cost from this supplier.</p>
+                        </div>
+                        
+                         <div className="space-y-2 relative">
+                            <Label htmlFor="masterSellingPrice">Master Selling Price <span className="text-red-500">*</span></Label>
+                            {/* --- START: (6. อัปเดต Input Field ของ Price) --- */}
+                            <Input 
+                                id="masterSellingPrice" 
+                                type="text"              // <-- เปลี่ยนเป็น text
+                                inputMode="decimal"     // <-- เพิ่ม inputMode
+                                placeholder="Enter selling price..." 
+                                value={masterSellingPrice}
+                                onChange={(e) => handlePriceChange(e, setMasterSellingPrice)} // <-- ใช้ handler ใหม่
+                                disabled={!selectedModel}
+                            />
+                            {/* --- END: (6. อัปเดต) --- */}
+                             <p className="text-xs text-muted-foreground">Smart Price: Auto-fills current price. Editing this updates the model.</p>
+                        </div>
+                    </div>
+
+                    {/* ... (ส่วนที่เหลือของ JSX - คงเดิมทั้งหมด) ... */}
                     {selectedModel && (
                         <div>
                             <div className="flex justify-end gap-2 mb-4">

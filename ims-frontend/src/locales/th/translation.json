@@ -650,5 +650,7 @@
   "active_borrowings_dialog_title": "ยืนยันการคืนสินค้า",
   "error_fetch_active_borrowings": "ไม่สามารถดึงข้อมูลการยืมได้",
   "success_items_returned": "รับคืนสินค้า {{count}} รายการเรียบร้อยแล้ว",
-  "error_returning_items": "เกิดข้อผิดพลาดระหว่างการรับคืนสินค้า"
+  "error_returning_items": "เกิดข้อผิดพลาดระหว่างการรับคืนสินค้า",
+  "error_historical_cost_required": "จำเป็นต้องกรอกต้นทุน (Purchase Price) ที่ถูกต้องสำหรับทุกรายการ",
+  "tableHeader_price_cost": "ราคาขาย / ต้นทุน (บาท)"
 }

@@ -1,7 +1,7 @@
 // src/pages/MasterSearchPage.jsx
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
@@ -14,9 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
-// --- 1. เปลี่ยน Icon ---
-import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Download, FileSearch } from "lucide-react"; 
-// --- END ---
+import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, PlusCircle, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Download, FileSearch } from "lucide-react"; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +40,14 @@ const displayFormattedMac = (mac) => {
     return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
 };
 
+// --- START: 1. เพิ่ม Helper จัดรูปแบบตัวเลข (สำหรับ Price/Cost) ---
+const formatNumber = (value) => {
+    if (value === null || value === undefined) return '-';
+    // เพิ่ม comma และสัญลักษณ์ Baht
+    return value.toLocaleString('en-US') + ' ฿';
+};
+// --- END: 1. เพิ่ม Helper ---
+
 const formatMacAddress = (value) => {
   const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
   if (cleaned.length === 0) return '';
@@ -53,6 +59,7 @@ const validateMacAddress = (mac) => {
   return macRegex.test(mac);
 };
 
+// --- START: 2. เพิ่ม purchasePrice เข้าไปใน State เริ่มต้น ---
 const initialEditFormData = {
     serialNumber: "",
     macAddress: "",
@@ -60,7 +67,9 @@ const initialEditFormData = {
     status: "IN_STOCK",
     supplierId: "",
     notes: "",
+    purchasePrice: "" // <-- เพิ่ม Field นี้
 };
+// --- END: 2. เพิ่ม State ---
 
 const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, className }) => (
     <TableHead className={`cursor-pointer hover:bg-muted/50 ${className}`} onClick={() => onSort(sortKey)}>
@@ -72,16 +81,23 @@ const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, c
 );
 
 
-// --- 2. เปลี่ยนชื่อ Component ---
 export default function MasterSearchPage() {
-// --- END ---
     const navigate = useNavigate();
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
     const currentUser = useAuthStore((state) => state.user);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
 
+    const location = useLocation();
+    const initialStatus = location.state?.status || "All";
+
+    const [isBatchAddOpen, setIsBatchAddOpen] = useState(false); // (คงไว้สำหรับปุ่มในอนาคต หากต้องการ)
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    
+    // --- START: 3. เพิ่ม State สำหรับ Loading (แก้ไข Bug) ---
+    const [isEditLoading, setIsEditLoading] = useState(false);
+    // --- END: 3. เพิ่ม State ---
+
     const [editFormData, setEditFormData] = useState(initialEditFormData);
     const [editingItemId, setEditingItemId] = useState(null);
     const [selectedModelInfo, setSelectedModelInfo] = useState(null);
@@ -94,6 +110,7 @@ export default function MasterSearchPage() {
     const [exportSortBy, setExportSortBy] = useState('serialNumber');
     const [isExporting, setIsExporting] = useState(false);
 
+    // ... (handleExport function - คงเดิม) ...
     const handleExport = async (exportFiltered) => {
         setIsExporting(true);
         toast.info("Generating your export file, please wait...");
@@ -137,14 +154,13 @@ export default function MasterSearchPage() {
         data: inventoryItems, pagination, isLoading, searchTerm, filters,
         sortBy, sortOrder, handleSortChange,
         handleSearchChange, handlePageChange, handleItemsPerPageChange, handleFilterChange, refreshData
-    // --- 3. เปลี่ยน Default Filter ที่นี่ ---
     } = usePaginatedFetch("/inventory", 10, {
-        status: "All", // <--- เปลี่ยนจาก "IN_STOCK" เป็น "All"
+        status: "All", // (นี่คือจุดที่ต่างจาก InventoryPage)
         categoryId: "All",
         brandId: "All"
     });
-    // --- END ---
 
+    // --- START: 4. อัปเดต openEditDialog ให้รวม purchasePrice ---
     const openEditDialog = (item) => {
         if (!item) return;
         setEditingItemId(item.id);
@@ -155,6 +171,7 @@ export default function MasterSearchPage() {
             status: item.status,
             supplierId: item.supplierId || "",
             notes: item.notes || "",
+            purchasePrice: item.purchasePrice || '' // <-- เพิ่ม Field นี้
         });
         setSelectedModelInfo(item.productModel);
         setInitialSupplier(item.supplier);
@@ -162,22 +179,40 @@ export default function MasterSearchPage() {
         setIsSerialRequired(item.productModel.category.requiresSerialNumber);
         setIsEditDialogOpen(true);
     };
+    // --- END: 4. อัปเดต ---
 
+    // --- START: 5. อัปเดต handleEditInputChange (ป้องกันการ Uppercase ราคา) ---
     const handleEditInputChange = (e) => {
         const { id, value } = e.target;
-        const upperValue = (id === 'serialNumber') ? value.toUpperCase() : value;
-        setEditFormData({ ...editFormData, [id]: upperValue });
-    };
+        
+        let processedValue = value;
+        // Only uppercase serialNumber or assetCode
+        if (id === 'serialNumber') {
+            processedValue = value.toUpperCase();
+        }
 
+        // ป้องกันไม่ให้ช่อง purchasePrice (ที่อาจเพิ่มเข้ามา) ถูก .toUpperCase()
+        if (id !== 'notes' && id !== 'purchasePrice') {
+             processedValue = value.toUpperCase();
+        }
+
+        setEditFormData({ ...editFormData, [id]: processedValue });
+    };
+    // --- END: 5. อัปเดต ---
+
+    // ... (handleEditMacAddressChange - คงเดิม) ...
     const handleEditMacAddressChange = (e) => {
         const formatted = formatMacAddress(e.target.value);
         setEditFormData({ ...editFormData, macAddress: formatted });
     };
     
-    const handleEditSupplierSelect = (supplierId) => {
-        setEditFormData(prev => ({ ...prev, supplierId: supplierId }));
+    // --- START: 6. แก้ไข Bug ของ Supplier Combobox (เหมือนที่ทำใน InventoryPage) ---
+    const handleEditSupplierSelect = (supplierObject) => {
+        setEditFormData(prev => ({ ...prev, supplierId: supplierObject ? String(supplierObject.id) : "" }));
     };
+    // --- END: 6. แก้ไข Bug ---
 
+    // ... (handleEditModelSelect - คงเดิม) ...
     const handleEditModelSelect = (model) => {
         if (model) {
             setEditFormData(prev => ({ ...prev, productModelId: model.id }));
@@ -189,26 +224,42 @@ export default function MasterSearchPage() {
         }
     };
 
+    // --- START: 7. อัปเดต handleEditSubmit (เพิ่ม Logic ต้นทุน และ Loading state) ---
     const handleEditSubmit = async (e) => {
         e.preventDefault();
+        setIsEditLoading(true); // <-- FIX BUG
+
         if (editFormData.macAddress && !validateMacAddress(editFormData.macAddress)) {
             toast.error("Invalid MAC Address format. Please use XX:XX:XX:XX:XX:XX format.");
+            setIsEditLoading(false); // <-- FIX BUG
             return;
         }
 
         if (isMacRequired && !editFormData.macAddress?.trim()) {
             toast.error("MAC Address is required for this product category.");
+            setIsEditLoading(false); // <-- FIX BUG
             return;
         }
 
         if (!editFormData.productModelId) {
             toast.error("Please select a Product Model.");
+            setIsEditLoading(false); // <-- FIX BUG
             return;
         }
         if (isSerialRequired && !editFormData.serialNumber?.trim()) {
             toast.error("Serial Number is required for this product category.");
+            setIsEditLoading(false); // <-- FIX BUG
             return;
         }
+
+        // --- เพิ่มการตรวจสอบ Purchase Price ---
+        const parsedPurchasePrice = parseFloat(editFormData.purchasePrice);
+        if (editFormData.purchasePrice && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
+             toast.error("Purchase Price must be a valid non-negative number.");
+             setIsEditLoading(false);
+             return;
+        }
+        // --- สิ้นสุดการตรวจสอบ ---
 
         const payload = {
             serialNumber: editFormData.serialNumber || null,
@@ -217,6 +268,7 @@ export default function MasterSearchPage() {
             status: editFormData.status,
             supplierId: editFormData.supplierId ? parseInt(editFormData.supplierId, 10) : null,
             notes: editFormData.notes || null,
+            purchasePrice: editFormData.purchasePrice ? parsedPurchasePrice : null, // <-- เพิ่ม Field นี้
         };
         try {
             await axiosInstance.put(`/inventory/${editingItemId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
@@ -225,9 +277,13 @@ export default function MasterSearchPage() {
             setIsEditDialogOpen(false);
         } catch (error) {
             toast.error(error.response?.data?.error || `Failed to save item.`);
+        } finally {
+            setIsEditLoading(false); // <-- FIX BUG
         }
     };
+    // --- END: 7. อัปเดต ---
     
+    // ... (confirmDelete, confirmDecommission, handleStatusChange, handleReinstateItem, handleSellItem, handleBorrowItem - ทั้งหมดคงเดิม) ...
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         try {
@@ -279,7 +335,6 @@ export default function MasterSearchPage() {
         <Card className="shadow-sm border-subtle">
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    {/* --- 4. เปลี่ยน Title, Icon, Description --- */}
                     <div>
                         <CardTitle className="flex items-center gap-2">
                             <FileSearch className="h-6 w-6" /> 
@@ -287,10 +342,9 @@ export default function MasterSearchPage() {
                         </CardTitle>
                         <CardDescription className="mt-1">ค้นหาประวัติสินค้าทั้งหมดในระบบ (รวมที่ขายแล้ว, ถูกยืม, หรือตัดจำหน่าย)</CardDescription>
                     </div>
-                    {/* --- END --- */}
                     {canManage &&
-                        // --- 5. ลบปุ่ม Add, เหลือไว้แค่ Export ---
                         <div className="flex items-center gap-2">
+                            {/* (เราจะไม่ใช้ปุ่ม Add Batch ในหน้านี้ แต่จะคงไว้ใน InventoryPage) */}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" disabled={isExporting}>
@@ -320,7 +374,6 @@ export default function MasterSearchPage() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
-                        // --- END ---
                     }
                 </div>
             </CardHeader>
@@ -346,9 +399,7 @@ export default function MasterSearchPage() {
                             <SelectValue placeholder={t('filter_by_status')} />
                         </SelectTrigger>
                         <SelectContent>
-                            {/* --- 6. ตรวจสอบว่า Filter Status เริ่มต้นที่ All --- */}
                             <SelectItem value="All">{t('status_all')}</SelectItem> 
-                            {/* --- END --- */}
                             <SelectItem value="IN_STOCK">{t('status_in_stock')}</SelectItem>
                             <SelectItem value="SOLD">{t('status_sold')}</SelectItem>
                             <SelectItem value="BORROWED">{t('status_borrowed')}</SelectItem>
@@ -362,33 +413,52 @@ export default function MasterSearchPage() {
                 </div>
                 <div className="border rounded-md">
                     <Table>
+                        {/* --- START: 8. อัปเดต TableHeader (Layout ใหม่ 7 คอลัมน์) --- */}
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <SortableHeader sortKey="category" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_category')}</SortableHeader>
-                                <SortableHeader sortKey="brand" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_brand')}</SortableHeader>
                                 <SortableHeader sortKey="productModel" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_productModel')}</SortableHeader>
                                 <SortableHeader sortKey="serialNumber" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_serialNumber')}</SortableHeader>
                                 <SortableHeader sortKey="macAddress" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_macAddress')}</SortableHeader>
+                                <SortableHeader sortKey="purchasePrice" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_price_cost')}</SortableHeader>
                                 <TableHead className="text-center">{t('tableHeader_status')}</TableHead>
                                 <TableHead>{t('tableHeader_addedBy')}</TableHead>
                                 <TableHead className="text-center">{t('tableHeader_actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
+                        {/* --- END: 8. อัปเดต --- */}
+
+                        {/* --- START: 9. อัปเดต TableBody (Layout ใหม่) --- */}
                         <TableBody>
                             {isLoading ? (
                                 [...Array(pagination.itemsPerPage)].map((_, i) => (
                                     <TableRow key={i}>
-                                        <TableCell colSpan={8}><div className="h-8 bg-muted rounded animate-pulse"></div></TableCell>
+                                        <TableCell colSpan={7}><div className="h-8 bg-muted rounded animate-pulse"></div></TableCell>
                                     </TableRow>
                                 ))
                             ) : inventoryItems.length > 0 ? (
                                 inventoryItems.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell>{item.productModel.category.name}</TableCell>
-                                        <TableCell>{item.productModel.brand.name}</TableCell>
-                                        <TableCell className="font-medium">{item.productModel.modelNumber}</TableCell>
+                                        {/* Col 1: Product (Combined) */}
+                                        <TableCell>
+                                            <div className="font-medium">{item.productModel.modelNumber}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {item.productModel.category.name} / {item.productModel.brand.name}
+                                            </div>
+                                        </TableCell>
+                                        {/* Col 2: S/N */}
                                         <TableCell>{item.serialNumber || '-'}</TableCell>
+                                        {/* Col 3: MAC */}
                                         <TableCell>{displayFormattedMac(item.macAddress)}</TableCell>
+                                        {/* Col 4: Price/Cost (New) */}
+                                        <TableCell>
+                                            <div className="font-medium text-green-600">
+                                                {`Price: ${formatNumber(item.productModel.sellingPrice)}`}
+                                            </div>
+                                            <div className="text-xs text-red-600">
+                                                 {`Cost: ${formatNumber(item.purchasePrice)}`}
+                                            </div>
+                                        </TableCell>
+                                        {/* Col 5: Status */}
                                         <TableCell className="text-center">
                                             <StatusBadge
                                                 status={item.status}
@@ -402,7 +472,9 @@ export default function MasterSearchPage() {
                                                 interactive={true}
                                             />
                                         </TableCell>
+                                        {/* Col 6: Added By */}
                                         <TableCell>{item.addedBy.name}</TableCell>
+                                        {/* Col 7: Actions (คงเดิม) */}
                                         <TableCell className="text-center">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
@@ -497,13 +569,15 @@ export default function MasterSearchPage() {
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={8} className="text-center h-24">No items found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center h-24">No items found.</TableCell></TableRow>
                             )}
                         </TableBody>
+                         {/* --- END: 9. อัปเดต --- */}
                     </Table>
                 </div>
             </CardContent>
             <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+                 {/* ... (Pagination - คงเดิม) ... */}
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Label htmlFor="rows-per-page">{t('rows_per_page')}</Label>
                     <Select value={pagination ? String(pagination.itemsPerPage) : "10"} onValueChange={handleItemsPerPageChange}>
@@ -522,6 +596,7 @@ export default function MasterSearchPage() {
                 </div>
             </CardFooter>
 
+            {/* ... (Alert Dialogs - คงเดิม) ... */}
             <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -547,7 +622,9 @@ export default function MasterSearchPage() {
                 </AlertDialogContent>
             </AlertDialog>
             
-            {/* Dialog สำหรับ Edit (คงไว้เหมือนเดิม) */}
+            {/* (ปุ่ม BatchAdd ถูกลบไปแล้วจาก Header) */}
+            
+            {/* --- START: 10. อัปเดต Edit Dialog JSX (เพิ่มช่อง Cost และ Loading state) --- */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>{t('edit')} Item</DialogTitle></DialogHeader>
@@ -566,7 +643,7 @@ export default function MasterSearchPage() {
                             <Label>{t('suppliers')}</Label>
                             <SupplierCombobox
                                 selectedValue={editFormData.supplierId}
-                                onSelect={handleEditSupplierSelect}
+                                onSelect={handleEditSupplierSelect} // (ใช้ Handler ที่แก้ไขแล้ว)
                                 initialSupplier={initialSupplier}
                             />
                         </div>
@@ -585,6 +662,26 @@ export default function MasterSearchPage() {
                                 placeholder="AA:BB:CC:DD:EE:FF"
                              />
                         </div>
+
+                        {/* --- (เพิ่มช่อง Cost และ Status) --- */}
+                        <div className="grid grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="purchasePrice">Purchase Price (Cost) <span className="text-muted-foreground text-xs ml-1">{t('optional_label')}</span></Label>
+                                <Input 
+                                    id="purchasePrice" 
+                                    type="number"
+                                    placeholder="Enter cost price..."
+                                    value={editFormData.purchasePrice} 
+                                    onChange={handleEditInputChange} 
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>{t('status_label')}</Label>
+                                <Input id="status" value={editFormData.status} disabled readOnly />
+                            </div>
+                        </div>
+                        {/* --- (สิ้นสุดช่องที่เพิ่ม) --- */}
+
                         <div className="space-y-2">
                             <Label htmlFor="notes">{t('notes')}</Label>
                             <Textarea
@@ -595,10 +692,13 @@ export default function MasterSearchPage() {
                                 rows={3}
                             />
                         </div>
-                        <DialogFooter><Button type="submit">{t('save')}</Button></DialogFooter>
+                        <DialogFooter><Button type="submit" disabled={isEditLoading}>
+                            {isEditLoading ? t('saving') : t('save')}
+                        </Button></DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
+            {/* --- END: 10. อัปเดต --- */}
         </Card>
     );
 }

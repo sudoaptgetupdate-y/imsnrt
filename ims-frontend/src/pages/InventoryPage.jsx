@@ -8,12 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { usePaginatedFetch } from "@/hooks/usePaginatedFetch";
-import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
 import { MoreHorizontal, View, ShoppingCart, ArrowRightLeft, Edit, Trash2, PlusCircle, Archive, History, ShieldAlert, ArchiveRestore, ShieldCheck, ArrowUpDown, Package, Download } from "lucide-react";
 import {
   DropdownMenu,
@@ -31,37 +29,27 @@ import { BrandCombobox } from "@/components/ui/BrandCombobox";
 import { CategoryCombobox } from "@/components/ui/CategoryCombobox";
 import { useTranslation } from "react-i18next";
 import BatchAddInventoryDialog from "@/components/dialogs/BatchAddInventoryDialog";
-import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
-import { Textarea } from "@/components/ui/textarea";
+import EditInventoryDialog from "@/components/dialogs/EditInventoryDialog";
+
 
 const displayFormattedMac = (mac) => {
+    // ... (ฟังก์ชันนี้คงเดิม) ...
     if (!mac || mac.length !== 12) {
         return mac || '-';
     }
     return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
 };
 
-const formatMacAddress = (value) => {
-  const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-  if (cleaned.length === 0) return '';
-  return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || cleaned;
+// --- START: 1. อัปเดต Helper ให้เพิ่มสัญลักษณ์ ฿ ---
+const formatNumber = (value) => {
+    if (value === null || value === undefined) return '-';
+    // เพิ่ม comma และสัญลักษณ์ Baht
+    return value.toLocaleString('en-US') + ' ฿';
 };
-
-const validateMacAddress = (mac) => {
-  const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-  return macRegex.test(mac);
-};
-
-const initialEditFormData = {
-    serialNumber: "",
-    macAddress: "",
-    productModelId: "",
-    status: "IN_STOCK",
-    supplierId: "",
-    notes: "",
-};
+// --- END: 1. อัปเดต Helper ---
 
 const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, className }) => (
+    // ... (ฟังก์ชันนี้คงเดิม) ...
     <TableHead className={`cursor-pointer hover:bg-muted/50 ${className}`} onClick={() => onSort(sortKey)}>
         <div className="flex items-center gap-2">
             {children}
@@ -74,6 +62,7 @@ const SortableHeader = ({ children, sortKey, currentSortBy, sortOrder, onSort, c
 export default function InventoryPage() {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    // ... (States และ Handlers ทั้งหมดคงเดิมเหมือนไฟล์ล่าสุดที่ Refactor ไปแล้ว) ...
     const token = useAuthStore((state) => state.token);
     const currentUser = useAuthStore((state) => state.user);
     const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
@@ -82,13 +71,10 @@ export default function InventoryPage() {
     const initialStatus = location.state?.status || "All";
 
     const [isBatchAddOpen, setIsBatchAddOpen] = useState(false);
+
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [editFormData, setEditFormData] = useState(initialEditFormData);
     const [editingItemId, setEditingItemId] = useState(null);
-    const [selectedModelInfo, setSelectedModelInfo] = useState(null);
-    const [initialSupplier, setInitialSupplier] = useState(null);
-    const [isMacRequired, setIsMacRequired] = useState(true);
-    const [isSerialRequired, setIsSerialRequired] = useState(true);
+
     const [itemToDelete, setItemToDelete] = useState(null);
     const [itemToDecommission, setItemToDecommission] = useState(null);
     
@@ -144,89 +130,11 @@ export default function InventoryPage() {
         brandId: "All"
     });
 
-    const openEditDialog = (item) => {
-        if (!item) return;
+    const handleEditClick = (item) => {
         setEditingItemId(item.id);
-        setEditFormData({
-            serialNumber: item.serialNumber || '',
-            macAddress: item.macAddress ? displayFormattedMac(item.macAddress) : '',
-            productModelId: item.productModelId,
-            status: item.status,
-            supplierId: item.supplierId || "",
-            notes: item.notes || "",
-        });
-        setSelectedModelInfo(item.productModel);
-        setInitialSupplier(item.supplier);
-        setIsMacRequired(item.productModel.category.requiresMacAddress);
-        setIsSerialRequired(item.productModel.category.requiresSerialNumber);
         setIsEditDialogOpen(true);
     };
 
-    const handleEditInputChange = (e) => {
-        const { id, value } = e.target;
-        const upperValue = (id === 'serialNumber') ? value.toUpperCase() : value;
-        setEditFormData({ ...editFormData, [id]: upperValue });
-    };
-
-    const handleEditMacAddressChange = (e) => {
-        const formatted = formatMacAddress(e.target.value);
-        setEditFormData({ ...editFormData, macAddress: formatted });
-    };
-    
-    const handleEditSupplierSelect = (supplierId) => {
-        setEditFormData(prev => ({ ...prev, supplierId: supplierId }));
-    };
-
-    const handleEditModelSelect = (model) => {
-        if (model) {
-            setEditFormData(prev => ({ ...prev, productModelId: model.id }));
-            setSelectedModelInfo(model);
-            setIsMacRequired(model.category.requiresMacAddress);
-            setIsSerialRequired(model.category.requiresSerialNumber);
-            if (!model.category.requiresMacAddress) setEditFormData(prev => ({ ...prev, macAddress: '' }));
-            if (!model.category.requiresSerialNumber) setEditFormData(prev => ({ ...prev, serialNumber: '' }));
-        }
-    };
-
-    const handleEditSubmit = async (e) => {
-        e.preventDefault();
-        if (editFormData.macAddress && !validateMacAddress(editFormData.macAddress)) {
-            toast.error("Invalid MAC Address format. Please use XX:XX:XX:XX:XX:XX format.");
-            return;
-        }
-
-        if (isMacRequired && !editFormData.macAddress?.trim()) {
-            toast.error("MAC Address is required for this product category.");
-            return;
-        }
-
-        if (!editFormData.productModelId) {
-            toast.error("Please select a Product Model.");
-            return;
-        }
-        if (isSerialRequired && !editFormData.serialNumber?.trim()) {
-            toast.error("Serial Number is required for this product category.");
-            return;
-        }
-
-        const payload = {
-            serialNumber: editFormData.serialNumber || null,
-            macAddress: editFormData.macAddress ? editFormData.macAddress.replace(/[:-\s]/g, '') : null,
-            productModelId: parseInt(editFormData.productModelId, 10),
-            status: editFormData.status,
-            supplierId: editFormData.supplierId ? parseInt(editFormData.supplierId, 10) : null,
-            notes: editFormData.notes || null,
-        };
-        try {
-            await axiosInstance.put(`/inventory/${editingItemId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-            toast.success(`Item updated successfully!`);
-            refreshData();
-            setIsEditDialogOpen(false);
-        } catch (error) {
-            toast.error(error.response?.data?.error || `Failed to save item.`);
-        }
-    };
-    
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         try {
@@ -274,8 +182,10 @@ export default function InventoryPage() {
     const handleSellItem = (itemToSell) => navigate('/sales/new', { state: { initialItems: [itemToSell] } });
     const handleBorrowItem = (itemToBorrow) => navigate('/borrowings/new', { state: { initialItems: [itemToBorrow] } });
 
+
     return (
         <Card className="shadow-sm border-subtle">
+            {/* ... (CardHeader - คงเดิม) ... */}
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
@@ -324,6 +234,7 @@ export default function InventoryPage() {
                 </div>
             </CardHeader>
 
+            {/* ... (CardContent / Filters - คงเดิม) ... */}
             <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Input
@@ -359,34 +270,55 @@ export default function InventoryPage() {
                 </div>
                 <div className="border rounded-md">
                     <Table>
+                        {/* --- START: 2. อัปเดต TableHeader (ใช้ key ใหม่) --- */}
                         <TableHeader>
                             <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <SortableHeader sortKey="category" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_category')}</SortableHeader>
-                                <SortableHeader sortKey="brand" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_brand')}</SortableHeader>
                                 <SortableHeader sortKey="productModel" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_productModel')}</SortableHeader>
                                 <SortableHeader sortKey="serialNumber" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_serialNumber')}</SortableHeader>
                                 <SortableHeader sortKey="macAddress" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_macAddress')}</SortableHeader>
+                                
+                                <SortableHeader sortKey="purchasePrice" currentSortBy={sortBy} sortOrder={sortOrder} onSort={handleSortChange}>{t('tableHeader_price_cost')}</SortableHeader>
+                                
                                 <TableHead className="text-center">{t('tableHeader_status')}</TableHead>
                                 <TableHead>{t('tableHeader_addedBy')}</TableHead>
                                 <TableHead className="text-center">{t('tableHeader_actions')}</TableHead>
                             </TableRow>
                         </TableHeader>
+                        {/* --- END: 2. อัปเดต TableHeader --- */}
+
                         <TableBody>
                             {isLoading ? (
                                 [...Array(pagination.itemsPerPage)].map((_, i) => (
                                     <TableRow key={i}>
-                                        <TableCell colSpan={8}><div className="h-8 bg-muted rounded animate-pulse"></div></TableCell>
+                                        <TableCell colSpan={7}><div className="h-8 bg-muted rounded animate-pulse"></div></TableCell>
                                     </TableRow>
                                 ))
                             ) : inventoryItems.length > 0 ? (
                                 inventoryItems.map((item) => (
                                     <TableRow key={item.id}>
-                                        <TableCell>{item.productModel.category.name}</TableCell>
-                                        <TableCell>{item.productModel.brand.name}</TableCell>
-                                        <TableCell className="font-medium">{item.productModel.modelNumber}</TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{item.productModel.modelNumber}</div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {item.productModel.category.name} / {item.productModel.brand.name}
+                                            </div>
+                                        </TableCell>
+                                        
                                         <TableCell>{item.serialNumber || '-'}</TableCell>
                                         <TableCell>{displayFormattedMac(item.macAddress)}</TableCell>
+                                        
+                                        {/* --- START: 3. สลับตำแหน่ง Price/Cost และใช้ formatNumber --- */}
+                                        <TableCell>
+                                            <div className="font-medium text-green-600">
+                                                {`Price: ${formatNumber(item.productModel.sellingPrice)}`}
+                                            </div>
+                                            <div className="text-xs text-red-600">
+                                                 {`Cost: ${formatNumber(item.purchasePrice)}`}
+                                            </div>
+                                        </TableCell>
+                                        {/* --- END: 3. สลับตำแหน่ง Price/Cost --- */}
+
                                         <TableCell className="text-center">
+                                            {/* ... (StatusBadge - คงเดิม) ... */}
                                             <StatusBadge
                                                 status={item.status}
                                                 className="w-24"
@@ -401,6 +333,7 @@ export default function InventoryPage() {
                                         </TableCell>
                                         <TableCell>{item.addedBy.name}</TableCell>
                                         <TableCell className="text-center">
+                                            {/* ... (Dropdown Menu - คงเดิม) ... */}
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="primary-outline" size="icon" className="h-8 w-14 p-0">
@@ -439,7 +372,7 @@ export default function InventoryPage() {
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
-                                                                onClick={() => openEditDialog(item)}
+                                                                onClick={() => handleEditClick(item)}
                                                                 disabled={!['IN_STOCK', 'RESERVED', 'DEFECTIVE'].includes(item.status)}
                                                             >
                                                                 <Edit className="mr-2 h-4 w-4" /> {t('edit')}
@@ -494,12 +427,14 @@ export default function InventoryPage() {
                                     </TableRow>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={8} className="text-center h-24">No items found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={7} className="text-center h-24">No items found.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
                 </div>
             </CardContent>
+
+            {/* ... (CardFooter / Pagination - คงเดิม) ... */}
             <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Label htmlFor="rows-per-page">{t('rows_per_page')}</Label>
@@ -519,6 +454,7 @@ export default function InventoryPage() {
                 </div>
             </CardFooter>
 
+            {/* ... (AlertDialogs and Dialog Components - คงเดิม) ... */}
             <AlertDialog open={!!itemToDelete} onOpenChange={(isOpen) => !isOpen && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -546,57 +482,15 @@ export default function InventoryPage() {
             {isBatchAddOpen && (
                 <BatchAddInventoryDialog isOpen={isBatchAddOpen} setIsOpen={setIsBatchAddOpen} onSave={refreshData} />
             )}
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>{t('edit')} Item</DialogTitle></DialogHeader>
-                    <form onSubmit={handleEditSubmit} className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                             <Label>{t('tableHeader_productModel')}</Label>
-                             <ProductModelCombobox onSelect={handleEditModelSelect} initialModel={selectedModelInfo} />
-                        </div>
-                        {selectedModelInfo && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>{t('tableHeader_category')}</Label><Input value={selectedModelInfo.category.name} disabled /></div>
-                                <div className="space-y-2"><Label>{t('tableHeader_brand')}</Label><Input value={selectedModelInfo.brand.name} disabled /></div>
-                            </div>
-                        )}
-                        <div className="space-y-2">
-                            <Label>{t('suppliers')}</Label>
-                            <SupplierCombobox
-                                selectedValue={editFormData.supplierId}
-                                onSelect={handleEditSupplierSelect}
-                                initialSupplier={initialSupplier}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="serialNumber">{t('tableHeader_serialNumber')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                            <Input id="serialNumber" value={editFormData.serialNumber || ''} onChange={handleEditInputChange} required={isSerialRequired} />
-                        </div>
-                        <div className="space-y-2">
-                             <Label htmlFor="macAddress">{t('tableHeader_macAddress')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                             <Input
-                                id="macAddress"
-                                value={editFormData.macAddress || ''}
-                                onChange={handleEditMacAddressChange}
-                                required={isMacRequired}
-                                maxLength={17}
-                                placeholder="AA:BB:CC:DD:EE:FF"
-                             />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">{t('notes')}</Label>
-                            <Textarea
-                                id="notes"
-                                value={editFormData.notes}
-                                onChange={handleEditInputChange}
-                                placeholder="Add or edit notes for this item..."
-                                rows={3}
-                            />
-                        </div>
-                        <DialogFooter><Button type="submit">{t('save')}</Button></DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            
+            <EditInventoryDialog 
+                isOpen={isEditDialogOpen}
+                onClose={() => setIsEditDialogOpen(false)}
+                onSave={() => {
+                    refreshData();
+                }}
+                itemId={editingItemId}
+            />
         </Card>
     );
 }

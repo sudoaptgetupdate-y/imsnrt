@@ -1,205 +1,322 @@
-// src/components/dialogs/EditAssetDialog.jsx
-
 import { useState, useEffect } from "react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductModelCombobox } from "@/components/ui/ProductModelCombobox";
+import { SupplierCombobox } from "@/components/ui/SupplierCombobox";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { toast } from 'sonner';
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
 import { useTranslation } from "react-i18next";
-import { SupplierCombobox } from "../ui/SupplierCombobox";
-import { Textarea } from "../ui/textarea";
-
-const displayFormattedMac = (mac) => {
-    if (!mac || mac.length !== 12) return mac || '';
-    return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
-};
+import { Loader2 } from "lucide-react";
 
 const formatMacAddress = (value) => {
-  const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
-  if (cleaned.length === 0) return '';
-  return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || '';
+    const cleaned = (value || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase();
+    if (cleaned.length === 0) return '';
+    return cleaned.match(/.{1,2}/g)?.slice(0, 6).join(':') || cleaned;
 };
 
 const validateMacAddress = (mac) => {
-  if (!mac) return true;
   const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
   return macRegex.test(mac);
 };
 
-export default function EditAssetDialog({ isOpen, setIsOpen, asset, onSave }) {
+// ... (Asset statuses remain the same) ...
+const ASSET_STATUSES = [
+  "IN_WAREHOUSE",
+  "ASSIGNED",
+  "DEFECTIVE",
+  "IN_REPAIR",
+  "DECOMMISSIONED"
+];
+
+export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) {
     const { t } = useTranslation();
+    const [asset, setAsset] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(false);
+    
+    // --- START: PHASE 6 (1. เพิ่ม purchasePrice ใน state) ---
+    const [formData, setFormData] = useState({
+        assetCode: '',
+        serialNumber: '',
+        macAddress: '',
+        notes: '',
+        status: '',
+        purchasePrice: '' 
+    });
+    // --- END: PHASE 6 ---
+    
+    const [selectedModel, setSelectedModel] = useState(null);
+    const [selectedSupplierId, setSelectedSupplierId] = useState("");
+    const [categoryInfo, setCategoryInfo] = useState({
+        name: '',
+        requiresSerialNumber: false,
+        requiresMacAddress: false
+    });
     const token = useAuthStore((state) => state.token);
-    const [formData, setFormData] = useState(null);
-    const [selectedModelInfo, setSelectedModelInfo] = useState(null);
-    const [initialSupplier, setInitialSupplier] = useState(null);
-    const [isMacRequired, setIsMacRequired] = useState(true);
-    const [isSerialRequired, setIsSerialRequired] = useState(true);
 
     useEffect(() => {
-        if (asset) {
-            setFormData({
-                productModelId: asset.productModelId,
-                assetCode: asset.assetCode,
-                serialNumber: asset.serialNumber || '',
-                macAddress: displayFormattedMac(asset.macAddress),
-                status: asset.status,
-                notes: asset.notes || '',
-                supplierId: asset.supplierId || "",
+        if (selectedModel) {
+            setCategoryInfo({
+                name: selectedModel.category.name,
+                requiresSerialNumber: selectedModel.category.requiresSerialNumber,
+                requiresMacAddress: selectedModel.category.requiresMacAddress
             });
-            setSelectedModelInfo(asset.productModel);
-            setInitialSupplier(asset.supplier);
-            setIsMacRequired(asset.productModel.category.requiresMacAddress);
-            setIsSerialRequired(asset.productModel.category.requiresSerialNumber);
+        } else {
+            setCategoryInfo({ name: '', requiresSerialNumber: false, requiresMacAddress: false });
         }
-    }, [asset]);
-
-    const handleModelSelect = (model) => {
-        if (model) {
-            setFormData(prev => ({ ...prev, productModelId: model.id }));
-            setSelectedModelInfo(model);
-            setIsMacRequired(model.category.requiresMacAddress);
-            setIsSerialRequired(model.category.requiresSerialNumber);
-        }
-    };
+    }, [selectedModel]);
     
-    const handleSupplierSelect = (supplierId) => {
-        setFormData(prev => ({...prev, supplierId: supplierId}));
-    };
-
-    const handleInputChange = (e) => {
+    useEffect(() => {
+        const fetchAsset = async () => {
+            if (assetId && isOpen) {
+                setIsFetching(true);
+                try {
+                    const response = await axiosInstance.get(`/assets/${assetId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const assetData = response.data;
+                    setAsset(assetData);
+                    
+                    // --- START: PHASE 6 (2. Set purchasePrice ใน form data) ---
+                    setFormData({
+                        assetCode: assetData.assetCode || '',
+                        serialNumber: assetData.serialNumber || '',
+                        macAddress: formatMacAddress(assetData.macAddress) || '',
+                        notes: assetData.notes || '',
+                        status: assetData.status || '',
+                        purchasePrice: assetData.purchasePrice || '' 
+                    });
+                    // --- END: PHASE 6 ---
+                    
+                    setSelectedModel(assetData.productModel);
+                    setSelectedSupplierId(assetData.supplierId ? String(assetData.supplierId) : "");
+                } catch (error) {
+                    toast.error(t('error_fetch_asset'));
+                    handleClose();
+                } finally {
+                    setIsFetching(false);
+                }
+            }
+        };
+        fetchAsset();
+    }, [assetId, isOpen, token, t]);
+    
+    const handleChange = (e) => {
         const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
-    };
-
-    const handleMacAddressChange = (e) => {
-        const formatted = formatMacAddress(e.target.value);
-        setFormData({ ...formData, macAddress: formatted });
+        let processedValue = value;
+        if (id === 'macAddress') {
+            processedValue = formatMacAddress(value);
+        } else if (id !== 'notes') {
+            processedValue = value.toUpperCase();
+        }
+        setFormData(prev => ({ ...prev, [id]: processedValue }));
     };
 
     const handleStatusChange = (value) => {
-        setFormData(prev => ({...prev, status: value}));
+        setFormData(prev => ({ ...prev, status: value }));
     };
     
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (formData.macAddress && !validateMacAddress(formData.macAddress)) {
-            toast.error(t('error_invalid_mac'));
+    const handleSubmit = async () => {
+        setIsLoading(true);
+
+        const { assetCode, serialNumber, macAddress, notes, status, purchasePrice } = formData;
+
+        if (!selectedModel) {
+            toast.error(t('error_select_model'));
+            setIsLoading(false);
             return;
         }
-        if (isMacRequired && !formData.macAddress) {
-            toast.error("MAC Address is required for this product category.");
+        if (!selectedSupplierId) {
+            toast.error(t('error_select_supplier'));
+            setIsLoading(false);
+            return;
+        }
+        if (!assetCode.trim()) {
+            toast.error(t('error_asset_code_required'));
+            setIsLoading(false);
             return;
         }
 
-        const payload = {
-            ...formData,
-            macAddress: formData.macAddress ? formData.macAddress.replace(/[:-\s]/g, '') : null,
+        const { requiresSerialNumber, requiresMacAddress } = categoryInfo;
+        if (requiresSerialNumber && !serialNumber.trim()) {
+            toast.error(t('error_serial_required_category'));
+            setIsLoading(false);
+            return;
         }
+        if (requiresMacAddress && !macAddress.trim()) {
+            toast.error(t('error_mac_required_category'));
+            setIsLoading(false);
+            return;
+        }
+        if (macAddress && !validateMacAddress(macAddress.trim())) {
+            toast.error(t('error_invalid_mac'));
+            setIsLoading(false);
+            return;
+        }
+
+        // --- START: PHASE 6 (3. ตรวจสอบ purchasePrice) ---
+        const parsedPurchasePrice = parseFloat(purchasePrice);
+        if (purchasePrice !== '' && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
+            toast.error("Purchase Price must be a valid non-negative number.");
+            setIsLoading(false);
+            return;
+        }
+        // --- END: PHASE 6 ---
 
         try {
-            await axiosInstance.put(`/assets/${asset.id}`, payload, {
+            // --- START: PHASE 6 (4. เพิ่ม purchasePrice และ supplierId ใน payload) ---
+            const payload = {
+                productModelId: selectedModel.id,
+                supplierId: parseInt(selectedSupplierId),
+                assetCode: assetCode.trim(),
+                serialNumber: serialNumber.trim() || null,
+                macAddress: macAddress.trim() || null,
+                notes: notes.trim() || null,
+                status: status,
+                purchasePrice: purchasePrice ? parsedPurchasePrice : null
+            };
+            // --- END: PHASE 6 ---
+            
+            await axiosInstance.put(`/assets/${assetId}`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
             toast.success(t('success_asset_updated'));
             onSave();
-            setIsOpen(false);
+            handleClose();
+
         } catch (error) {
             toast.error(error.response?.data?.error || "Failed to update asset.");
+        } finally {
+            setIsLoading(false);
         }
+    };
+    
+    const handleClose = () => {
+        setIsOpen(false);
+        setAsset(null);
+        setSelectedModel(null);
+        setSelectedSupplierId("");
+        // Reset form data
+        setFormData({
+            assetCode: '', serialNumber: '', macAddress: '', notes: '', status: '', purchasePrice: ''
+        });
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="sm:max-w-2xl">
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className="max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{t('edit_asset_dialog_title')}</DialogTitle>
                     <DialogDescription>{t('edit_asset_dialog_description')}</DialogDescription>
                 </DialogHeader>
-                {!formData ? (
-                    <p>{t('loading_asset')}</p>
+
+                {isFetching ? (
+                    <div className="flex justify-center items-center h-64">
+                        <Loader2 className="mr-2 h-8 w-8 animate-spin" />
+                        <span>{t('loading_asset')}</span>
+                    </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                    <div className="space-y-6 py-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <div className="space-y-2">
-                                <Label>{t('product_model_label')}</Label>
-                                <ProductModelCombobox
-                                    onSelect={handleModelSelect}
-                                    initialModel={selectedModelInfo}
+                            <div className="space-y-2">
+                                <Label htmlFor="productModel">{t('product_model_label')} <span className="text-red-500">*</span></Label>
+                                <ProductModelCombobox onSelect={setSelectedModel} selectedValue={selectedModel} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="category">{t('category_label')}</Label>
+                                <Input id="category" value={categoryInfo.name} disabled readOnly />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="assetCode">{t('asset_code_label')} <span className="text-red-500">*</span></Label>
+                            <Input id="assetCode" value={formData.assetCode} onChange={handleChange} />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="serialNumber">
+                                    {t('serial_number_label')}
+                                    {categoryInfo.requiresSerialNumber && <span className="text-red-500 ml-1">*</span>}
+                                </Label>
+                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleChange} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="macAddress">
+                                    {t('mac_address_label')}
+                                    {categoryInfo.requiresMacAddress && <span className="text-red-500 ml-1">*</span>}
+                                </Label>
+                                <Input id="macAddress" value={formData.macAddress} onChange={handleChange} placeholder={t('mac_address_placeholder')} />
+                            </div>
+                        </div>
+
+                        {/* --- START: PHASE 6 (5. เพิ่มช่องกรอก Supplier และ Purchase Price) --- */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="space-y-2">
+                                <Label htmlFor="supplier">{t('supplier_label')} <span className="text-red-500">*</span></Label>
+                                <SupplierCombobox
+                                    selectedValue={selectedSupplierId}
+                                    onSelect={(supplier) => setSelectedSupplierId(supplier ? String(supplier.id) : "")}
                                 />
                             </div>
                             <div className="space-y-2">
-                               <Label>{t('status_label')}</Label>
-                               <Select value={formData.status} onValueChange={handleStatusChange}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="IN_WAREHOUSE">In Warehouse</SelectItem>
-                                    <SelectItem value="ASSIGNED" disabled>Assigned</SelectItem>
-                                    <SelectItem value="DEFECTIVE">Defective</SelectItem>
-                                    <SelectItem value="DECOMMISSIONED">Decommissioned</SelectItem>
-                                </SelectContent>
-                               </Select>
-                           </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                           <Label>{t('supplier_label')}</Label>
-                           <SupplierCombobox
-                                selectedValue={String(formData.supplierId)}
-                                onSelect={handleSupplierSelect}
-                                initialSupplier={initialSupplier}
-                           />
-                        </div>
-
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="assetCode">{t('asset_code_label')}</Label>
-                                <Input id="assetCode" value={formData.assetCode} onChange={handleInputChange} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="serialNumber">{t('serial_number_label')} {isSerialRequired && <span className="text-red-500 ml-1">*</span>} {!isSerialRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                                <Input id="serialNumber" value={formData.serialNumber} onChange={handleInputChange} required={isSerialRequired} />
+                                <Label htmlFor="purchasePrice">Purchase Price (Cost)</Label>
+                                <Input 
+                                    id="purchasePrice" 
+                                    type="number"
+                                    placeholder="Enter cost price..."
+                                    value={formData.purchasePrice} 
+                                    onChange={handleChange} 
+                                />
                             </div>
                         </div>
+                        {/* --- END: PHASE 6 --- */}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="macAddress">{t('mac_address_label')} {isMacRequired && <span className="text-red-500 ml-1">*</span>} {!isMacRequired && <span className="text-xs text-slate-500 ml-2">({t('not_required_label')})</span>}</Label>
-                            <Input 
-                                id="macAddress" 
-                                value={formData.macAddress} 
-                                onChange={handleMacAddressChange} 
-                                required={isMacRequired}
-                                maxLength={17}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="status">{t('status_label')}</Label>
+                                <Select onValueChange={handleStatusChange} value={formData.status}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {ASSET_STATUSES.map(status => (
+                                            <SelectItem key={status} value={status}>
+                                                {t(`status_${status.toLowerCase()}`)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="assignedTo">{t('assigned_to_label')}</Label>
+                                <Input id="assignedTo" value={asset?.assignedTo?.name || '---'} disabled readOnly />
+                            </div>
                         </div>
-                        
+
                         <div className="space-y-2">
                             <Label htmlFor="notes">{t('notes_label')}</Label>
-                            <Textarea 
-                                id="notes" 
-                                value={formData.notes} 
-                                onChange={handleInputChange}
-                                placeholder="Add or edit notes for this asset..."
-                                rows={3}
-                            />
+                            <Input id="notes" value={formData.notes} onChange={handleChange} />
                         </div>
-
-                        <DialogFooter>
-                            <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>{t('cancel')}</Button>
-                            <Button type="submit">{t('save_asset_button')}</Button>
-                        </DialogFooter>
-                    </form>
+                    </div>
                 )}
+                
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="ghost">{t('cancel')}</Button></DialogClose>
+                    <Button onClick={handleSubmit} disabled={isLoading || isFetching}>
+                        {isLoading ? t('saving') : t('save_asset_button')}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
-
