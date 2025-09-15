@@ -12,6 +12,9 @@ const superAdminAccess = ['SUPER_ADMIN'];
 
 // Routes for inventory items (for SALE)
 router.get('/', authCheck, inventoryController.getAllInventoryItems);
+// --- START: 1. เพิ่ม Route ใหม่สำหรับ "Smart Cost" (Phase 3) ---
+router.get('/last-cost', authCheck, inventoryController.getLatestCostPrice);
+// --- END ---
 router.get('/:id', authCheck, inventoryController.getInventoryItemById);
 
 
@@ -23,6 +26,7 @@ router.post('/', authCheck, roleCheck(adminAccess), inventoryController.addInven
 router.put('/:id', authCheck, roleCheck(adminAccess), inventoryController.updateInventoryItem);
 router.delete('/:id', authCheck, roleCheck(adminAccess), inventoryController.deleteInventoryItem);
 
+// ... (Status change routes remain the same) ...
 router.patch('/:id/decommission', authCheck, roleCheck(adminAccess), inventoryController.decommissionItem);
 router.patch('/:id/reinstate', authCheck, roleCheck(adminAccess), inventoryController.reinstateItem);
 

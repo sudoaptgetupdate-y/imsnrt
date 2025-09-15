@@ -4,24 +4,24 @@ const prisma = require('../prisma/client');
 const { EventType } = require('@prisma/client');
 const saleController = {};
 
-// --- START: MODIFIED ---
+// ... (createEventLog function remains the same) ...
 const createEventLog = (tx, inventoryItemId, userId, eventType, details, timestamp = new Date()) => {
-// --- END: MODIFIED ---
     return tx.eventLog.create({
         data: { 
             inventoryItemId, 
             userId, 
             eventType, 
             details,
-            // --- START: ADDED ---
             createdAt: timestamp
-            // --- END: ADDED ---
         },
     });
 };
 
+
 saleController.createSale = async (req, res, next) => {
-    const { customerId, inventoryItemIds, notes } = req.body; // 1. รับค่า notes จาก request
+    // --- START: 1. รับ purchasePrice เข้ามาด้วย (แม้ว่าเราจะไม่ได้ใช้โดยตรง แต่ itemsToSell จะมีข้อมูลนี้) ---
+    const { customerId, inventoryItemIds, notes } = req.body;
+    // --- END ---
     const soldById = req.user.id; 
 
     const parsedCustomerId = parseInt(customerId, 10);
@@ -44,7 +44,12 @@ saleController.createSale = async (req, res, next) => {
                     id: { in: inventoryItemIds },
                     status: 'IN_STOCK' 
                 },
-                include: { productModel: { select: { sellingPrice: true } } },
+                // --- START: 2. Include purchasePrice เพื่อคำนวณต้นทุน ---
+                include: { 
+                    productModel: { select: { sellingPrice: true } },
+                    // (purchasePrice อยู่ใน level เดียวกัน ไม่ต้อง include เพิ่ม)
+                },
+                // --- END ---
             });
 
             if (itemsToSell.length !== inventoryItemIds.length) {
@@ -60,9 +65,12 @@ saleController.createSale = async (req, res, next) => {
                 throw err;
             }
 
+            // --- START: 3. คำนวณราคาขายและต้นทุน ---
             const subtotal = itemsToSell.reduce((sum, item) => sum + (item.productModel?.sellingPrice || 0), 0);
+            const totalCostOfSale = itemsToSell.reduce((sum, item) => sum + (item.purchasePrice || 0), 0); // <-- เพิ่มบรรทัดนี้
             const vatAmount = subtotal * 0.07;
             const total = subtotal + vatAmount;
+            // --- END ---
 
             const newSale = await tx.sale.create({
                 data: {
@@ -71,7 +79,8 @@ saleController.createSale = async (req, res, next) => {
                     subtotal,
                     vatAmount,
                     total,
-                    notes, // 2. เพิ่ม notes ตอนสร้าง sale
+                    totalCost: totalCostOfSale, // <-- 4. บันทึกต้นทุนลง DB
+                    notes,
                 },
             });
 
@@ -111,8 +120,7 @@ saleController.createSale = async (req, res, next) => {
     }
 };
 
-// ... (โค้ดส่วน getAllSales และ getSaleById) ...
-
+// ... (getAllSales and getSaleById functions remain the same) ...
 saleController.getAllSales = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -121,20 +129,15 @@ saleController.getAllSales = async (req, res, next) => {
         const statusFilter = req.query.status || 'All'; 
         const skip = (page - 1) * limit;
 
-        // --- START: เพิ่มโค้ดส่วนนี้ ---
-        const sortBy = req.query.sortBy || 'saleDate'; // ค่าเริ่มต้นเป็น saleDate
-        const sortOrder = req.query.sortOrder || 'desc'; // ค่าเริ่มต้นเป็น desc
+        const sortBy = req.query.sortBy || 'saleDate';
+        const sortOrder = req.query.sortOrder || 'desc';
 
-        // Logic สำหรับสร้าง object orderBy แบบไดนามิก
         let orderBy = {};
         if (sortBy === 'customer') {
-            // กรณีพิเศษ: ถ้าต้องการเรียงตามชื่อลูกค้า (ซึ่งเป็น relation)
             orderBy = { customer: { name: sortOrder } };
         } else {
-            // กรณีทั่วไป: เรียงตาม field ใน Model Sale (เช่น id, saleDate, total)
             orderBy = { [sortBy]: sortOrder };
         }
-        // --- END: จบส่วนที่เพิ่ม ---
 
         const whereConditions = [];
 
@@ -158,8 +161,7 @@ saleController.getAllSales = async (req, res, next) => {
                 where,
                 skip,
                 take: limit,
-                // orderBy: { saleDate: 'desc' }, // <--- ลบ/แก้ไขบรรทัดนี้
-                orderBy: orderBy, // <--- ใช้ object ใหม่ที่เราสร้าง
+                orderBy: orderBy, 
                 include: {
                     customer: true,
                     soldBy: { select: { id: true, name: true } },
@@ -228,6 +230,7 @@ saleController.getSaleById = async (req, res, next) => {
     }
 };
 
+// ... (voidSale function remains the same) ...
 saleController.voidSale = async (req, res, next) => {
     const { id } = req.params;
     const voidedById = req.user.id;
@@ -298,6 +301,7 @@ saleController.voidSale = async (req, res, next) => {
     }
 };
 
+
 saleController.createHistoricalSale = async (req, res, next) => {
     const { customerId, inventoryItemIds, notes, saleDate } = req.body;
     const soldById = req.user.id;
@@ -325,7 +329,7 @@ saleController.createHistoricalSale = async (req, res, next) => {
             const itemsToSell = await tx.inventoryItem.findMany({
                 where: { 
                     id: { in: inventoryItemIds },
-                    status: 'IN_STOCK' // หรือสถานะอื่นที่เหมาะสม
+                    status: 'IN_STOCK' // (Items must be created first by historical inventory)
                 },
                 include: { productModel: { select: { sellingPrice: true } } },
             });
@@ -336,10 +340,12 @@ saleController.createHistoricalSale = async (req, res, next) => {
                 throw err;
             }
             
-            // ... (โค้ดคำนวณราคาสินค้าเหมือนเดิม) ...
+            // --- START: 5. คำนวณต้นทุนสำหรับ Historical Sale ด้วย ---
             const subtotal = itemsToSell.reduce((sum, item) => sum + (item.productModel?.sellingPrice || 0), 0);
+            const totalCostOfSale = itemsToSell.reduce((sum, item) => sum + (item.purchasePrice || 0), 0); // <-- เพิ่มบรรทัดนี้
             const vatAmount = subtotal * 0.07;
             const total = subtotal + vatAmount;
+            // --- END ---
 
             const newSale = await tx.sale.create({
                 data: {
@@ -348,9 +354,10 @@ saleController.createHistoricalSale = async (req, res, next) => {
                     subtotal,
                     vatAmount,
                     total,
+                    totalCost: totalCostOfSale, // <-- 6. บันทึกต้นทุน
                     notes,
-                    saleDate: new Date(saleDate), // ใช้ saleDate ที่ส่งมา
-                    createdAt: new Date(saleDate) // ตั้งค่า createdAt เป็นวันที่ขายด้วย
+                    saleDate: new Date(saleDate),
+                    createdAt: new Date(saleDate)
                 },
             });
 
@@ -362,7 +369,6 @@ saleController.createHistoricalSale = async (req, res, next) => {
             const customer = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
 
             for (const itemId of inventoryItemIds) {
-                // --- START: MODIFIED ---
                 await createEventLog(
                     tx,
                     itemId,
@@ -373,9 +379,8 @@ saleController.createHistoricalSale = async (req, res, next) => {
                         saleId: newSale.id,
                         details: `Item sold to ${customer.name} (Historical Entry).`
                     },
-                    new Date(saleDate) // Pass the historical date here
+                    new Date(saleDate)
                 );
-                // --- END: MODIFIED ---
             }
 
             return newSale;

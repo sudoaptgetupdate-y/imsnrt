@@ -2,9 +2,9 @@ const prisma = require('../prisma/client');
 const { ItemType, EventType } = require('@prisma/client');
 const assetController = {};
 
-const macRegex = /^[0-9A-Fa-f]{12}$/; // Regex for MAC address without separators
+// ... (Helper function createEventLog and createAsset remain the same) ...
+const macRegex = /^[0-9A-Fa-f]{12}$/;
 
-// Helper function to create event logs consistently
 const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
     return tx.eventLog.create({
         data: {
@@ -17,8 +17,9 @@ const createEventLog = (tx, inventoryItemId, userId, eventType, details) => {
 };
 
 assetController.createAsset = async (req, res, next) => {
+    // ... (This function remains unchanged) ...
     try {
-        const { serialNumber, macAddress, productModelId, assetCode, supplierId, notes } = req.body;
+        const { serialNumber, macAddress, productModelId, assetCode, supplierId, notes, purchasePrice } = req.body;
         const userId = req.user.id;
 
         if (typeof assetCode !== 'string' || assetCode.trim() === '') {
@@ -32,6 +33,13 @@ assetController.createAsset = async (req, res, next) => {
             const err = new Error('Product Model ID is required and must be a valid number.');
             err.statusCode = 400;
             return next(err);
+        }
+        
+        const parsedPurchasePrice = parseFloat(purchasePrice);
+        if (purchasePrice !== undefined && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
+             const err = new Error('Purchase Price must be a valid non-negative number.');
+             err.statusCode = 400;
+             return next(err);
         }
 
         const productModel = await prisma.productModel.findUnique({
@@ -72,6 +80,7 @@ assetController.createAsset = async (req, res, next) => {
                     serialNumber: serialNumber || null,
                     macAddress: cleanMacAddress || null,
                     notes: notes || null,
+                    purchasePrice: (purchasePrice !== undefined) ? parsedPurchasePrice : null,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId) : null,
                     addedById: userId,
@@ -96,9 +105,11 @@ assetController.createAsset = async (req, res, next) => {
     }
 };
 
+// --- START: SMART PRICE (1. Modify addBatchAssets) ---
 assetController.addBatchAssets = async (req, res, next) => {
     try {
-        const { productModelId, supplierId, items } = req.body;
+        // (1. Add sellingPrice to destructuring)
+        const { productModelId, supplierId, items, purchasePrice, sellingPrice } = req.body;
         const userId = req.user.id;
         
         const parsedModelId = parseInt(productModelId, 10);
@@ -114,6 +125,22 @@ assetController.addBatchAssets = async (req, res, next) => {
             return next(err);
         }
         
+        const parsedPurchasePrice = parseFloat(purchasePrice);
+        if (purchasePrice === undefined || isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0) {
+             const err = new Error('A valid non-negative Purchase Price for the batch is required.');
+             err.statusCode = 400;
+             return next(err);
+        }
+        
+        // (2. Add validation for sellingPrice)
+        const parsedSellingPrice = parseFloat(sellingPrice);
+        if (sellingPrice === undefined || isNaN(parsedSellingPrice) || parsedSellingPrice < 0) {
+            const err = new Error('A valid non-negative Selling Price is required.');
+            err.statusCode = 400;
+            return next(err);
+        }
+        // ---
+
         const productModel = await prisma.productModel.findUnique({
             where: { id: parsedModelId },
             include: { category: true },
@@ -127,6 +154,7 @@ assetController.addBatchAssets = async (req, res, next) => {
 
         const newAssets = await prisma.$transaction(async (tx) => {
             const createdAssets = [];
+            // (Item creation loop remains the same)
             for (const item of items) {
                 if (!item.assetCode || typeof item.assetCode !== 'string' || item.assetCode.trim() === '') {
                     throw new Error('Asset Code is required for all items in the list.');
@@ -149,6 +177,7 @@ assetController.addBatchAssets = async (req, res, next) => {
                         serialNumber: item.serialNumber || null,
                         macAddress: cleanMacAddress || null,
                         notes: item.notes || null,
+                        purchasePrice: parsedPurchasePrice,
                         productModelId: parsedModelId,
                         supplierId: supplierId ? parseInt(supplierId) : null,
                         addedById: userId,
@@ -165,6 +194,16 @@ assetController.addBatchAssets = async (req, res, next) => {
                 
                 createdAssets.push(createdAsset);
             }
+            
+            // (3. Add Logic to update Model Price if it changed)
+            if (productModel.sellingPrice !== parsedSellingPrice) {
+                await tx.productModel.update({
+                    where: { id: parsedModelId },
+                    data: { sellingPrice: parsedSellingPrice },
+                });
+            }
+            // ---
+
             return createdAssets;
         });
 
@@ -177,12 +216,16 @@ assetController.addBatchAssets = async (req, res, next) => {
         next(error);
     }
 };
+// --- END: SMART PRICE ---
 
+
+// ... (All other controller functions: updateAsset, deleteAsset, getAllAssets, getAssetById, and status changers remain the same) ...
 assetController.updateAsset = async (req, res, next) => {
+    // ... (This function remains unchanged) ...
     const { id } = req.params;
     const actorId = req.user.id;
     try {
-        const { assetCode, serialNumber, macAddress, status, productModelId, supplierId, notes } = req.body;
+        const { assetCode, serialNumber, macAddress, status, productModelId, supplierId, notes, purchasePrice } = req.body;
 
         const assetId = parseInt(id);
         if (isNaN(assetId)) {
@@ -202,6 +245,13 @@ assetController.updateAsset = async (req, res, next) => {
             err.statusCode = 400;
             return next(err);
         }
+
+         const parsedPurchasePrice = parseFloat(purchasePrice);
+         if (purchasePrice !== undefined && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
+             const err = new Error('Purchase Price must be a valid non-negative number.');
+             err.statusCode = 400;
+             return next(err);
+         }
 
         const productModel = await prisma.productModel.findUnique({
             where: { id: parsedModelId },
@@ -247,6 +297,7 @@ assetController.updateAsset = async (req, res, next) => {
                     macAddress: cleanMacAddressForUpdate || null,
                     status,
                     notes: notes || null,
+                    purchasePrice: (purchasePrice !== undefined) ? parsedPurchasePrice : undefined,
                     productModelId: parsedModelId,
                     supplierId: supplierId ? parseInt(supplierId, 10) : null,
                 },
@@ -270,6 +321,7 @@ assetController.updateAsset = async (req, res, next) => {
 };
 
 assetController.deleteAsset = async (req, res, next) => {
+    // ... (This function remains unchanged) ...
     const { id } = req.params;
     try {
         const assetId = parseInt(id);
@@ -321,6 +373,7 @@ assetController.deleteAsset = async (req, res, next) => {
 };
 
 assetController.getAllAssets = async (req, res, next) => {
+    // ... (This function remains unchanged) ...
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
@@ -424,6 +477,7 @@ assetController.getAllAssets = async (req, res, next) => {
 };
 
 assetController.getAssetById = async (req, res, next) => {
+    // ... (This function remains unchanged) ...
     try {
         const { id } = req.params;
         const assetId = parseInt(id);
@@ -452,7 +506,7 @@ assetController.getAssetById = async (req, res, next) => {
         if (!item) {
             const err = new Error('Asset not found');
             err.statusCode = 404;
-            return next(err);
+            throw err;
         }
         
         const currentHolder = item.assignmentRecords[0]?.assignment.assignee.name || null;
@@ -465,6 +519,7 @@ assetController.getAssetById = async (req, res, next) => {
 };
 
 const updateAssetStatus = async (res, req, next, expectedStatus, newStatus, eventType, details) => {
+    // ... (This function remains unchanged) ...
     const { id } = req.params;
     const actorId = req.user.id;
     try {
@@ -508,18 +563,22 @@ const updateAssetStatus = async (res, req, next, expectedStatus, newStatus, even
 };
 
 assetController.decommissionAsset = (req, res, next) => {
+    // ... (This function remains unchanged) ...
     updateAssetStatus(res, req, next, ['IN_WAREHOUSE', 'DEFECTIVE'], 'DECOMMISSIONED', EventType.DECOMMISSION, 'Asset decommissioned.');
 };
 
 assetController.reinstateAsset = (req, res, next) => {
+    // ... (This function remains unchanged) ...
     updateAssetStatus(res, req, next, 'DECOMMISSIONED', 'IN_WAREHOUSE', EventType.REINSTATE, 'Asset reinstated to warehouse.');
 };
 
 assetController.markAsDefective = (req, res, next) => {
+    // ... (This function remains unchanged) ...
     updateAssetStatus(res, req, next, 'IN_WAREHOUSE', 'DEFECTIVE', EventType.UPDATE, 'Asset marked as defective.');
 };
 
 assetController.markAsInWarehouse = (req, res, next) => {
+    // ... (This function remains unchanged) ...
     updateAssetStatus(res, req, next, 'DEFECTIVE', 'IN_WAREHOUSE', EventType.UPDATE, 'Asset returned to warehouse from defective status.');
 };
 
