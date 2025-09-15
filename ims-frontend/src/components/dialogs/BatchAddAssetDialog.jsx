@@ -283,7 +283,7 @@ export default function BatchAddAssetDialog({ isOpen, setIsOpen, onSave }) {
                             <Label>{t('supplier_label')} <span className="text-red-500">*</span></Label>
                             <SupplierCombobox
                                 selectedValue={selectedSupplierId}
-                                onSelect={(value) => setSelectedSupplierId(value)}
+                                onSelect={(supplierObject) => setSelectedSupplierId(supplierObject ? String(supplierObject.id) : "")}
                             />
                         </div>
                     </div>
