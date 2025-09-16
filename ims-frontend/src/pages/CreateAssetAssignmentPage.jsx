@@ -165,7 +165,14 @@ export default function CreateAssetAssignmentPage() {
                                         <TableCell>{asset.productModel.modelNumber}</TableCell>
                                         <TableCell>{asset.serialNumber || '-'}</TableCell>
                                         <TableCell className="text-center">
-                                            <Button variant="primary-outline" size="sm" onClick={() => handleAddItem(asset)}>{t('add')}</Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleAddItem(asset)}
+                                                className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                            >
+                                                {t('add')}
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 ))) : (

@@ -318,7 +318,12 @@ export default function CreateRepairPage() {
                                                 <TableCell>{item.assetCode || '-'}</TableCell>
                                                 <TableCell><StatusBadge status={item.status} /></TableCell>
                                                 <TableCell className="text-center">
-                                                    <Button variant="primary-outline" size="sm" onClick={() => handleAddItem(item)}>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleAddItem(item)}
+                                                        className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                                    >
                                                         {t('add')}
                                                     </Button>
                                                 </TableCell>
@@ -382,7 +387,12 @@ export default function CreateRepairPage() {
                                                     <TableCell>{item.serialNumber}</TableCell>
                                                     <TableCell>{new Date(item.purchaseDate).toLocaleDateString()}</TableCell>
                                                     <TableCell className="text-center">
-                                                        <Button variant="primary-outline" size="sm" onClick={() => handleAddItem(item)}>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleAddItem(item)}
+                                                            className="text-blue-600 hover:text-blue-700 hover:border-blue-600"
+                                                        >
                                                             {t('add')}
                                                         </Button>
                                                     </TableCell>
