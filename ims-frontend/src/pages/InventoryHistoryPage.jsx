@@ -141,20 +141,26 @@ export default function InventoryHistoryPage() {
     };
 
     // --- START: 3. อัปเดต Logic การแสดงราคา (แก้ไขใหม่ทั้งหมด) ---
-    const isSold = itemDetails.status === 'SOLD';
     const costPrice = itemDetails.purchasePrice; // ต้นทุน (ถูกต้องเสมอ)
 
     let displayPrice;
     let priceLabel;
 
-    if (isSold && itemDetails.saleItem) {
-        // สถานะ: SOLD และมีข้อมูลการขาย (saleItem)
-        // นี่คือ "ราคาที่ขายไปจริง" จากตาราง SaleItem
+    // 1. ตรวจสอบ "ราคา Snapshot" (ที่เราเพิ่งเพิ่ม) ก่อน
+    if (itemDetails.sellingPriceSnapshot !== null && itemDetails.sellingPriceSnapshot !== undefined) {
+        // ถ้ามี: ให้ใช้ราคานั้น (เช่น 2000)
+        displayPrice = itemDetails.sellingPriceSnapshot;
+        priceLabel = t('historical_sold_price'); // "ราคาที่ขายไป"
+    } 
+    // 2. ตรวจสอบ Logic เดิมของคุณ (สำหรับข้อมูลเก่าก่อนที่จะมี snapshot)
+    else if (itemDetails.status === 'SOLD' && itemDetails.saleItem) {
+        // ถ้าเป็นของเก่าที่ขายไปแล้ว และมี saleItem
         displayPrice = itemDetails.saleItem.price;
-        priceLabel = t('historical_sold_price'); // "ราคาที่ขายไป" (อย่าลืมเพิ่มคำนี้ใน translation.json)
-    } else {
-        // สถานะ: IN_STOCK หรือสถานะอื่นๆ
-        // นี่คือ "ราคาขายปัจจุบัน" จากตาราง ProductModel
+        priceLabel = t('historical_sold_price');
+    }
+    // 3. ถ้าไม่ใช่ทั้ง 2 กรณี (เช่น ของยังไม่ขาย)
+    else {
+        // ให้แสดงราคาปัจจุบันจาก Model (เช่น 2200)
         displayPrice = itemDetails.productModel.sellingPrice;
         priceLabel = t('product_model_form_selling_price'); // "ราคาขาย (ปัจจุบัน)"
     }

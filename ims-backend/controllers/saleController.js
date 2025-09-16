@@ -84,24 +84,37 @@ saleController.createSale = async (req, res, next) => {
                 },
             });
 
-            await tx.inventoryItem.updateMany({
-                where: { id: { in: inventoryItemIds } },
-                data: { status: 'SOLD', saleId: newSale.id },
-            });
+            // --- START: แก้ไขส่วนนี้ (เปลี่ยนจาก updateMany เป็น Loop) ---
+            // (ลบ await tx.inventoryItem.updateMany(...) และ for...of loop เดิมทิ้ง)
 
-            for (const itemId of inventoryItemIds) {
+            for (const item of itemsToSell) {
+                const snapshotPrice = item.productModel?.sellingPrice || 0;
+
+                // 1. อัปเดต Item พร้อมราคา Snapshot
+                await tx.inventoryItem.update({
+                    where: { id: item.id },
+                    data: {
+                        status: 'SOLD',
+                        saleId: newSale.id,
+                        sellingPriceSnapshot: snapshotPrice // <-- บันทึกราคา Snapshot
+                    }
+                });
+
+                // 2. สร้าง Event Log
                 await createEventLog(
                     tx,
-                    itemId,
+                    item.id,
                     soldById,
                     EventType.SALE,
                     { 
                         customerName: customer.name,
                         saleId: newSale.id,
-                        details: `Item sold to ${customer.name}.`
+                        details: `Item sold to ${customer.name}.`,
+                        soldPrice: snapshotPrice // (บันทึกราคาลง log ด้วย)
                     }
                 );
             }
+            // --- END: จบการแก้ไข ---
 
             return tx.sale.findUnique({
                 where: { id: newSale.id },
@@ -361,27 +374,40 @@ saleController.createHistoricalSale = async (req, res, next) => {
                 },
             });
 
-            await tx.inventoryItem.updateMany({
-                where: { id: { in: inventoryItemIds } },
-                data: { status: 'SOLD', saleId: newSale.id },
-            });
-            
+            // --- START: แก้ไขส่วนนี้ (เปลี่ยนจาก updateMany เป็น Loop) ---
+            // (ลบ await tx.inventoryItem.updateMany(...) และ for...of loop เดิมทิ้ง)
+
             const customer = await tx.customer.findUnique({ where: { id: parsedCustomerId } });
 
-            for (const itemId of inventoryItemIds) {
+            for (const item of itemsToSell) {
+                const snapshotPrice = item.productModel?.sellingPrice || 0;
+
+                // 1. อัปเดต Item พร้อมราคา Snapshot
+                await tx.inventoryItem.update({
+                    where: { id: item.id },
+                    data: {
+                        status: 'SOLD',
+                        saleId: newSale.id,
+                        sellingPriceSnapshot: snapshotPrice // <-- บันทึกราคา Snapshot
+                    }
+                });
+
+                // 2. สร้าง Event Log
                 await createEventLog(
                     tx,
-                    itemId,
+                    item.id,
                     soldById,
                     EventType.SALE,
                     { 
                         customerName: customer.name,
                         saleId: newSale.id,
-                        details: `Item sold to ${customer.name} (Historical Entry).`
+                        details: `Item sold to ${customer.name} (Historical Entry).`,
+                        soldPrice: snapshotPrice
                     },
                     new Date(saleDate)
                 );
             }
+            // --- END: จบการแก้ไข ---
 
             return newSale;
         });
