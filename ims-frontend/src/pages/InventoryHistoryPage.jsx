@@ -9,18 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+// --- START: 1. เพิ่ม Icon (DollarSign) ---
 import { 
     ArrowLeft, ShoppingCart, ArrowRightLeft, CornerUpLeft, Package, 
-    ArchiveX, Wrench, ShieldCheck, History as HistoryIcon, PlusCircle, Edit, ArchiveRestore, ShieldAlert, Printer 
+    ArchiveX, Wrench, ShieldCheck, History as HistoryIcon, PlusCircle, Edit, ArchiveRestore, ShieldAlert, Printer, DollarSign 
 } from "lucide-react";
+// --- END ---
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { getStatusProperties } from "@/lib/statusUtils";
 import { useTranslation } from "react-i18next";
 import { Separator } from "@/components/ui/separator";
-// --- START: เพิ่ม Imports สำหรับการจัดรูปแบบวันที่ ---
 import { format } from "date-fns";
 import { th } from "date-fns/locale";
-// --- END ---
 
 const eventConfig = {
     CREATE: { icon: <PlusCircle className="h-4 w-4" /> },
@@ -46,13 +46,24 @@ const displayFormattedMac = (mac) => {
     return mac.match(/.{1,2}/g)?.join(':').toUpperCase() || mac;
 };
 
+// --- START: 2. เพิ่ม Helper จัดรูปแบบเงิน ---
+const formatCurrency = (value) => {
+    if (typeof value !== 'number' || value === null) {
+        return 'N/A';
+    }
+    return new Intl.NumberFormat('th-TH', { 
+        style: 'currency', 
+        currency: 'THB', 
+        minimumFractionDigits: 2 
+    }).format(value);
+};
+// --- END ---
+
 
 export default function InventoryHistoryPage() {
     const { itemId } = useParams();
     const navigate = useNavigate();
-    // --- START: เรียกใช้ i18n ---
     const { t, i18n } = useTranslation();
-    // --- END ---
     const token = useAuthStore((state) => state.token);
     const [itemDetails, setItemDetails] = useState(null);
     const [history, setHistory] = useState([]);
@@ -64,6 +75,7 @@ export default function InventoryHistoryPage() {
         const fetchData = async () => {
             if (!itemId || !token) return;
             try {
+                // Endpoint นี้จะไปเรียก getHistoryByItemId ที่เราแก้ไขแล้ว
                 const response = await axiosInstance.get(`/history/${itemId}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
@@ -78,23 +90,18 @@ export default function InventoryHistoryPage() {
         fetchData();
     }, [itemId, token]);
 
-    // --- START: เพิ่มฟังก์ชันจัดรูปแบบวันที่ตามภาษา ---
     const formatDateByLocale = (dateString, localeCode) => {
         try {
             const date = new Date(dateString);
             if (localeCode.startsWith('th')) {
-                // ถ้าเป็นภาษาไทย: แสดงเป็น DD/MM/BBBB (พ.ศ.)
                 const buddhistYear = date.getFullYear() + 543;
-                // ใช้ format 'dd/MM' และต่อด้วยปี พ.ศ. เพื่อให้แน่ใจว่าได้รูปแบบที่ถูกต้อง
                 return format(date, 'dd/MM', { locale: th }) + `/${buddhistYear}`;
             }
-            // ถ้าเป็นภาษาอังกฤษ: แสดงเป็น DD/MM/YYYY (ค.ศ.)
             return format(date, 'dd/MM/yyyy');
         } catch (error) {
             return "Invalid Date";
         }
     };
-    // --- END ---
 
     const getTransactionLink = (eventType, details) => {
         if (!details) return null;
@@ -133,6 +140,26 @@ export default function InventoryHistoryPage() {
         setCurrentPage(1);
     };
 
+    // --- START: 3. อัปเดต Logic การแสดงราคา (แก้ไขใหม่ทั้งหมด) ---
+    const isSold = itemDetails.status === 'SOLD';
+    const costPrice = itemDetails.purchasePrice; // ต้นทุน (ถูกต้องเสมอ)
+
+    let displayPrice;
+    let priceLabel;
+
+    if (isSold && itemDetails.saleItem) {
+        // สถานะ: SOLD และมีข้อมูลการขาย (saleItem)
+        // นี่คือ "ราคาที่ขายไปจริง" จากตาราง SaleItem
+        displayPrice = itemDetails.saleItem.price;
+        priceLabel = t('historical_sold_price'); // "ราคาที่ขายไป" (อย่าลืมเพิ่มคำนี้ใน translation.json)
+    } else {
+        // สถานะ: IN_STOCK หรือสถานะอื่นๆ
+        // นี่คือ "ราคาขายปัจจุบัน" จากตาราง ProductModel
+        displayPrice = itemDetails.productModel.sellingPrice;
+        priceLabel = t('product_model_form_selling_price'); // "ราคาขาย (ปัจจุบัน)"
+    }
+    // --- END: 3. จบการอัปเดต Logic ---
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center no-print">
@@ -161,7 +188,13 @@ export default function InventoryHistoryPage() {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-3">
                             <Package className="h-6 w-6" />
-                            <span>{itemDetails.productModel.modelNumber}</span>
+                            {/* หมายเหตุ: โค้ดนี้ตั้งสมมติฐานว่า productModel ถูก include มาแบบเต็ม
+                                (จากโค้ด controller ก่อนหน้านี้)
+                                ถ้า controller ของคุณ include แค่ 'productModel: true' 
+                                คุณอาจจะต้องปรับ productModel.modelNumber เป็น productModel.name หรือ field ที่มีอยู่
+                                แต่ถ้าคุณใช้ controller ที่ผมแก้ให้ (ที่มี include ซ้อน) โค้ดนี้จะทำงานได้เลย
+                            */}
+                            <span>{itemDetails.productModel.modelNumber || itemDetails.productModel.name}</span>
                         </CardTitle>
                         <CardDescription>
                             {t('item_history_description_title')}
@@ -169,6 +202,7 @@ export default function InventoryHistoryPage() {
                     </CardHeader>
                     <CardContent>
                         <Separator />
+                        {/* --- START: 4. แก้ไข Grid แสดงผล (เพิ่ม 2 ช่อง) --- */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-6 mt-4 text-sm">
                             <div>
                                 <p className="text-muted-foreground">{t('tableHeader_serialNumber')}</p>
@@ -184,7 +218,28 @@ export default function InventoryHistoryPage() {
                                     <p className="font-semibold text-foreground">{itemDetails.supplier.name}</p>
                                 </div>
                             )}
+                            
+                            {/* --- เพิ่ม 2 ช่องนี้ (ใช้ตัวแปรจาก Logic ที่แก้ไข) --- */}
+                            <div>
+                                <p className="text-muted-foreground flex items-center gap-1">
+                                    <DollarSign className="h-4 w-4 text-red-500" /> {t('stat_total_cost')}
+                                </p>
+                                <p className="font-semibold text-red-600">{formatCurrency(costPrice)}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground flex items-center gap-1">
+                                    <DollarSign className="h-4 w-4 text-green-500" /> 
+                                    {priceLabel} {/* <--- ใช้ป้ายกำกับ (Label) แบบ Dynamic */}
+                                </p>
+                                <p className="font-semibold text-green-600">
+                                    {formatCurrency(displayPrice)} {/* <--- ใช้ราคา (Price) แบบ Dynamic */}
+                                </p>
+                            </div>
+                            {/* --- สิ้นสุดส่วนที่เพิ่ม --- */}
+
                         </div>
+                        {/* --- END: 4. จบการแก้ไข Grid --- */}
+                        
                         {itemDetails.notes && (
                              <div className="mt-6">
                                 <h4 className="font-semibold">{t('notes')}</h4>
@@ -211,6 +266,11 @@ export default function InventoryHistoryPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
+                                    {/* หมายเหตุ: โค้ดส่วนนี้ตั้งสมมติฐานว่า `history` (ที่มาจาก eventLog)
+                                        มี eventType และ details.details ซึ่งอาจจะไม่ตรงกับ `eventLog`
+                                        คุณอาจจะต้องปรับ `event.details.details` เป็น `event.details` หรือ `event.message`
+                                        ขึ้นอยู่กับโครงสร้างตาราง `eventLog` ของคุณ
+                                    */}
                                     {paginatedHistory.length > 0 ? paginatedHistory.map((event) => {
                                         const link = getTransactionLink(event.eventType, event.details);
                                         const getDisplayInfo = (historyEvent) => {
@@ -225,11 +285,9 @@ export default function InventoryHistoryPage() {
                                         const { label: eventLabel } = getStatusProperties(displayStatus);
                                         return (
                                         <tr key={event.id} className="border-b">
-                                            {/* --- START: แก้ไขการแสดงผลวันที่ --- */}
                                             <td className="p-2">{formatDateByLocale(event.createdAt, i18n.language)}</td>
-                                            {/* --- END --- */}
                                             <td className="p-2" title={event.details?.details || 'N/A'}>
-                                                {event.details?.details || 'N/A'}
+                                                {event.details?.details || event.details || 'N/A'} {/* <--- อาจจะต้องปรับส่วนนี้ */}
                                             </td>
                                             <td className="p-2 print-hide">{event.user?.name || 'System'}</td>
                                             <td className="p-2 text-center print-hide">

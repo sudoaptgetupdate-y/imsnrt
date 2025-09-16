@@ -99,20 +99,39 @@ model User {
   accountStatus         AccountStatus @default(ACTIVE)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  // Relationships
   createdCategories     Category[]
   createdBrands         Brand[]
   createdProductModels  ProductModel[]
   addedInventoryItems   InventoryItem[] @relation("AddedBy")
   createdCustomers      Customer[]
+  createdSuppliers      Supplier[]
   salesMade             Sale[]
   approvedBorrowings    Borrowing[]     @relation("ApprovedBorrowings")
   voidedSales           Sale[]          @relation("VoidedSales")
-  
   approvedAssignments   AssetAssignment[] @relation("ApprovedAssignments")
   receivedAssignments   AssetAssignment[] @relation("ReceivedAssignments")
   createdRepairs        Repair[]
-  
   events                EventLog[]
+}
+
+model Supplier {
+  id            Int      @id @default(autoincrement())
+  supplierCode  String   @unique
+  name          String
+  contactPerson String?
+  phone         String?
+  address       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdById   Int
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  
+  inventoryItems InventoryItem[]
+
+  @@index([name])
 }
 
 model Customer {
@@ -127,6 +146,7 @@ model Customer {
   createdBy    User     @relation(fields: [createdById], references: [id])
   sales        Sale[]
   borrowings   Borrowing[]
+  repairs      Repair[]
 }
 
 model InventoryItem {
@@ -136,31 +156,38 @@ model InventoryItem {
   assetCode           String?                  @unique
   serialNumber        String?                  @unique
   macAddress          String?                  @unique
+  notes               String?
+  purchasePrice       Float?
   status              ItemStatus               @default(IN_STOCK)
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
+  
   productModelId      Int
   productModel        ProductModel             @relation(fields: [productModelId], references: [id])
+
   addedById           Int
   addedBy             User                     @relation("AddedBy", fields: [addedById], references: [id])
   
+  supplierId          Int?
+  supplier            Supplier?                @relation(fields: [supplierId], references: [id])
+
   assignmentRecords   AssetAssignmentOnItems[]
   saleId              Int?
   sale                Sale?                    @relation(fields: [saleId], references: [id])
   borrowingRecords    BorrowingOnItems[]
   repairRecords       RepairOnItems[]
-
   eventLogs           EventLog[]
 
   @@index([status])
   @@index([itemType])
   @@index([ownerType])
+  @@index([supplierId])
 }
 
 model Borrowing {
   id           Int       @id @default(autoincrement())
-  borrowerId   Int
-  borrower     Customer  @relation(fields: [borrowerId], references: [id])
+  customerId   Int
+  customer     Customer  @relation(fields: [customerId], references: [id])
   approvedById Int
   approvedBy   User      @relation("ApprovedBorrowings", fields: [approvedById], references: [id])
   borrowDate   DateTime  @default(now())
@@ -219,6 +246,7 @@ model ProductModel {
   createdById    Int
   createdBy      User     @relation(fields: [createdById], references: [id])
   inventoryItems InventoryItem[]
+
   @@unique([modelNumber, brandId])
 }
 
@@ -230,6 +258,8 @@ model Sale {
   subtotal   Float
   vatAmount  Float
   total      Float
+  totalCost  Float? 
+  notes      String?
   customerId Int
   customer   Customer @relation(fields: [customerId], references: [id])
   soldById   Int
@@ -296,6 +326,9 @@ model Repair {
   receiverId      Int
   receiver        Address  @relation("SentTo", fields: [receiverId], references: [id])
   
+  customerId      Int?
+  customer        Customer? @relation(fields: [customerId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+
   items           RepairOnItems[]
 }
 
@@ -326,4 +359,14 @@ model EventLog {
 
   @@index([inventoryItemId])
   @@index([eventType])
+}
+
+model CompanyProfile {
+  id           Int     @id @default(1)
+  name         String?
+  addressLine1 String? @db.Text
+  addressLine2 String?
+  phone        String?
+  taxId        String?
+  updatedAt    DateTime @updatedAt
 }
