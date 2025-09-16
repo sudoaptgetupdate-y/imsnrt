@@ -652,5 +652,7 @@
   "success_items_returned": "รับคืนสินค้า {{count}} รายการเรียบร้อยแล้ว",
   "error_returning_items": "เกิดข้อผิดพลาดระหว่างการรับคืนสินค้า",
   "error_historical_cost_required": "จำเป็นต้องกรอกต้นทุน (Purchase Price) ที่ถูกต้องสำหรับทุกรายการ",
-  "tableHeader_price_cost": "ราคาขาย / ต้นทุน (บาท)"
+  "tableHeader_price_cost": "ราคาขาย / ต้นทุน (บาท)",
+  "stat_total_cost": "ต้นทุนรวม (COGS)",
+  "stat_total_profit": "กำไรสุทธิ"
 }
