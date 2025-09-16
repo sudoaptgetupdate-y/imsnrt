@@ -652,7 +652,7 @@
   "success_items_returned": "{{count}} item(s) have been returned successfully.",
   "error_returning_items": "An error occurred while returning items.",
   "error_historical_cost_required": "A valid Purchase Price is required for all items.",
-  "tableHeader_price_cost": "Price / Cost (THB)",
+  "tableHeader_price_cost": "Cost / Price (THB)",
   "stat_total_cost": "Total Cost",
   "stat_total_profit": "Total Profit (Net)"
 }

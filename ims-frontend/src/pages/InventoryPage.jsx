@@ -308,11 +308,14 @@ export default function InventoryPage() {
                                         
                                         {/* --- START: 3. สลับตำแหน่ง Price/Cost และใช้ formatNumber --- */}
                                         <TableCell>
-                                            <div className="font-medium text-green-600">
-                                                {`Price: ${formatNumber(item.productModel.sellingPrice)}`}
-                                            </div>
-                                            <div className="text-xs text-red-600">
-                                                 {`Cost: ${formatNumber(item.purchasePrice)}`}
+                                            <div className="font-medium whitespace-nowrap">
+                                                <span className="text-red-600">
+                                                    {formatNumber(item.purchasePrice)}
+                                                </span>
+                                                <span className="text-muted-foreground mx-1">/</span>
+                                                <span className="text-green-600">
+                                                    {formatNumber(item.productModel.sellingPrice)}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         {/* --- END: 3. สลับตำแหน่ง Price/Cost --- */}
