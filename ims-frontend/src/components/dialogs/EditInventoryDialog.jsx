@@ -35,6 +35,22 @@ const validateMacAddress = (mac) => {
   return macRegex.test(mac);
 };
 
+// --- START: (Helpers สำหรับจัดรูปแบบราคา) ---
+const parseFormattedValue = (val) => String(val || '').replace(/,/g, '');
+
+const handlePriceChange = (e, setter) => {
+    const { value } = e.target;
+    const rawValue = parseFormattedValue(value);
+
+    if (rawValue === '' || /^[0-9]*\.?[0-9]*$/.test(rawValue)) {
+        const parts = rawValue.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        setter(parts.join('.'));
+    }
+};
+// --- END: (Helpers สำหรับจัดรูปแบบราคา) ---
+
+
 const initialEditFormData = {
     serialNumber: "",
     macAddress: "",
@@ -42,14 +58,13 @@ const initialEditFormData = {
     status: "IN_STOCK",
     supplierId: "",
     notes: "",
-    purchasePrice: "" // (รวม Purchase Price)
+    purchasePrice: ""
 };
 
 export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId }) {
     const { t } = useTranslation();
     const token = useAuthStore((state) => state.token);
     
-    // (State ทั้งหมดที่เกี่ยวกับ Edit ถูกย้ายมาที่นี่)
     const [isEditLoading, setIsEditLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(false);
     const [editFormData, setEditFormData] = useState(initialEditFormData);
@@ -64,13 +79,11 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
             const fetchItemData = async () => {
                 setIsFetching(true);
                 try {
-                    // (เราจะ fetch ข้อมูลล่าสุดเสมอ แทนการใช้ข้อมูลจากตารางโดยตรง เพื่อความถูกต้อง)
-                    // หมายเหตุ: API GET /inventory/:id ต้องมีอยู่ (ซึ่งมีอยู่แล้วใน inventoryController.js)
                     const response = await axiosInstance.get(`/inventory/${itemId}`, {
                          headers: { Authorization: `Bearer ${token}` }
                     });
                     
-                    const item = response.data; // (สมมติว่า API นี้ return item object ที่มี productModel และ supplier)
+                    const item = response.data; 
 
                     if (!item) {
                         toast.error("Failed to fetch item details.");
@@ -85,10 +98,10 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
                         status: item.status,
                         supplierId: item.supplierId || "",
                         notes: item.notes || "",
-                        purchasePrice: item.purchasePrice || ''
+                        purchasePrice: item.purchasePrice ? item.purchasePrice.toLocaleString('en-US') : ''
                     });
                     setSelectedModelInfo(item.productModel);
-                    setInitialSupplier(item.supplier); // (ต้องแน่ใจว่า GET /inventory/:id include supplier)
+                    setInitialSupplier(item.supplier); 
                     setIsMacRequired(item.productModel.category.requiresMacAddress);
                     setIsSerialRequired(item.productModel.category.requiresSerialNumber);
 
@@ -111,9 +124,17 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
 
     const handleEditInputChange = (e) => {
         const { id, value } = e.target;
-        // Only uppercase serialNumber
+        
+        if (id === 'purchasePrice') return;
+
         const processedValue = (id === 'serialNumber') ? value.toUpperCase() : value;
         setEditFormData({ ...editFormData, [id]: processedValue });
+    };
+
+    const handleCostChange = (e) => {
+        handlePriceChange(e, (value) => {
+            setEditFormData(prev => ({ ...prev, purchasePrice: value }));
+        });
     };
 
     const handleEditMacAddressChange = (e) => {
@@ -161,7 +182,7 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
             return;
         }
 
-        const parsedPurchasePrice = parseFloat(editFormData.purchasePrice);
+        const parsedPurchasePrice = parseFloat(parseFormattedValue(editFormData.purchasePrice));
         if (editFormData.purchasePrice && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
              toast.error("Purchase Price must be a valid non-negative number.");
              setIsEditLoading(false);
@@ -180,8 +201,8 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
         try {
             await axiosInstance.put(`/inventory/${itemId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
             toast.success(`Item updated successfully!`);
-            onSave(); // (เรียก onSave เพื่อ refresh ข้อมูลในตารางแม่)
-            onClose(); // (ปิด Dialog)
+            onSave(); 
+            onClose(); 
         } catch (error) {
             toast.error(error.response?.data?.error || `Failed to save item.`);
         } finally {
@@ -239,13 +260,16 @@ export default function EditInventoryDialog({ isOpen, onClose, onSave, itemId })
 
                         <div className="grid grid-cols-2 gap-4">
                              <div className="space-y-2">
-                                <Label htmlFor="purchasePrice">Purchase Price (Cost)</Label>
+                                {/* --- START: MODIFIED (เปลี่ยน Label เป็น t()) --- */}
+                                <Label htmlFor="purchasePrice">{t('purchase_price_label')}</Label>
+                                {/* --- END: MODIFIED --- */}
                                 <Input
                                     id="purchasePrice"
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="Enter cost price..."
                                     value={editFormData.purchasePrice}
-                                    onChange={handleEditInputChange}
+                                    onChange={handleCostChange}
                                 />
                             </div>
                             <div className="space-y-2">

@@ -26,40 +26,23 @@ const validateMacAddress = (mac) => {
   return macRegex.test(mac);
 };
 
-// (ค่าคงที่ ที่เราแก้ไข Bug ครั้งก่อน)
 const MAX_ITEMS_MANUAL = 50;
 const FIELDS_PER_ROW = 3; // serialNumber, macAddress, notes
 
-// --- START: (1. เพิ่ม Helpers สำหรับฟอร์แมต Comma) ---
-
-/**
- * ลบ comma ออกจาก string (e.g., "1,500.50" -> "1500.50")
- * @param {string} val 
- * @returns {string}
- */
+// --- START: (Helpers สำหรับฟอร์แมต Comma) ---
 const parseFormattedValue = (val) => String(val).replace(/,/g, '');
 
-/**
- * จัดการ onChange ของ Input ราคา, ลบตัวอักษรที่ไม่ใช่ตัวเลข, และเพิ่ม Commas กลับเข้าไป
- * @param {Event} e - Event object จาก Input
- * @param {Function} setter - ฟังก์ชัน React setState (e.g., setBatchPurchasePrice)
- */
 const handlePriceChange = (e, setter) => {
     const { value } = e.target;
     const rawValue = parseFormattedValue(value);
 
-    // อนุญาตเฉพาะตัวเลข และจุดทศนิยม 1 ตำแหน่ง
     if (rawValue === '' || /^[0-9]*\.?[0-9]*$/.test(rawValue)) {
-        // จัดการฟอร์แมตตัวเลขใหม่
         const parts = rawValue.split('.');
-        // เพิ่ม commas ให้กับส่วนเลขจำนวนเต็ม (หน้าจุดทศนิยม)
         parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        
-        // ตั้งค่า State เป็นค่าที่ฟอร์แมตแล้ว (e.g., "1,500" or "1,500." or "1,500.50")
         setter(parts.join('.'));
     }
 };
-// --- END: (1. เพิ่ม Helpers) ---
+// --- END: (Helpers) ---
 
 
 export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
@@ -76,7 +59,6 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
     const [isLoading, setIsLoading] = useState(false);
     const token = useAuthStore((state) => state.token);
 
-    // ... (Refs - คงเดิม) ...
     const inputRefs = useRef([]);
     const firstInputRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -89,7 +71,6 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         }
     }, [isOpen, selectedModel]);
     
-    // (Smart Cost useEffect - อัปเดตให้ใช้ toLocaleString เมื่อตั้งค่า)
     useEffect(() => {
         const fetchLastCost = async () => {
             if (selectedModel?.id && selectedSupplierId) {
@@ -102,15 +83,14 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                             supplierId: selectedSupplierId 
                         }
                     });
-                    // --- START: (2. ใช้ toLocaleString เพื่อฟอร์แมตค่าที่ดึงมา) ---
                     if (response.data.lastCost !== null) {
                         setBatchPurchasePrice(response.data.lastCost.toLocaleString('en-US'));
                     } else {
                         setBatchPurchasePrice(""); 
                     }
-                    // --- END: (2. อัปเดต) ---
                 } catch (error) {
-                    toast.error("Failed to fetch last cost price.");
+                    // --- MODIFIED ---
+                    toast.error(t('error_fetch_last_cost'));
                     setBatchPurchasePrice("");
                 } finally {
                     setIsCostLoading(false);
@@ -119,25 +99,21 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         };
 
         fetchLastCost();
-    }, [selectedModel?.id, selectedSupplierId, token]);
+    }, [selectedModel?.id, selectedSupplierId, token, t]); // <-- เพิ่ม t
 
 
     const handleModelSelect = (model) => {
         setSelectedModel(model);
-        setBatchPurchasePrice(""); // (Reset Smart Cost)
-        // --- START: (3. ใช้ toLocaleString เมื่อตั้งค่า Smart Price) ---
+        setBatchPurchasePrice(""); 
         setMasterSellingPrice(model ? (model.sellingPrice !== null ? model.sellingPrice.toLocaleString('en-US') : "") : ""); 
-        // --- END: (3. อัปเดต) ---
     };
     
-    // ... (handleSupplierSelect - คงเดิม) ...
     const handleSupplierSelect = (supplierObject) => {
         const newId = supplierObject ? String(supplierObject.id) : "";
         setSelectedSupplierId(newId);
-        setBatchPurchasePrice(""); // (Reset Smart Cost only)
+        setBatchPurchasePrice(""); 
     };
 
-    // ... (Functions: handleInputChange, addManualItemRow, removeManualItemRow, handleKeyDown, handleDownloadTemplate, handleFileImport - คงเดิม) ...
     const handleInputChange = (e, index, field) => {
         const { value } = e.target;
         let processedValue = value;
@@ -161,7 +137,8 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                 inputRefs.current[nextIndex]?.focus();
             }, 100);
         } else {
-            toast.info(`You can add or import a maximum of ${MAX_ITEMS_MANUAL} items at a time.`);
+            // --- MODIFIED ---
+            toast.info(t('max_items_limit_info', { max: MAX_ITEMS_MANUAL }));
         }
     };
 
@@ -226,13 +203,19 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                 const existingItems = manualItems.filter(item => item.serialNumber || item.macAddress || item.notes);
                 const combinedItems = [...existingItems, ...importedData];
                 if (combinedItems.length > MAX_ITEMS_MANUAL) {
-                    toast.error(`Cannot import ${importedData.length} items. The total would exceed the limit of ${MAX_ITEMS_MANUAL}.`);
+                    // --- MODIFIED ---
+                    toast.error(t('error_import_limit_exceeded', { 
+                        count: importedData.length, 
+                        max: MAX_ITEMS_MANUAL 
+                    }));
                     return;
                 }
                 setManualItems(combinedItems.length > 0 ? combinedItems : [{ serialNumber: '', macAddress: '', notes: '' }]);
-                toast.success(`${importedData.length} rows imported successfully.`);
+                // --- MODIFIED ---
+                toast.success(t('success_import_rows', { count: importedData.length }));
             },
-            error: (error) => toast.error("Failed to parse CSV file: " + error.message)
+            // --- MODIFIED ---
+            error: (error) => toast.error(t('error_parse_csv') + error.message)
         });
         event.target.value = null;
     };
@@ -244,36 +227,37 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
             if (!selectedModel) throw new Error(t('error_select_model'));
             if (!selectedSupplierId) throw new Error(t('error_select_supplier'));
             
-            // --- START: (4. ใช้ parser ก่อน parseFloat) ---
             const parsedPurchasePrice = parseFloat(parseFormattedValue(batchPurchasePrice));
             if (batchPurchasePrice === "" || isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0) {
-                 throw new Error("Purchase Price is required and must be a non-negative number.");
+                 // --- MODIFIED ---
+                 throw new Error(t('error_purchase_price_required'));
             }
 
             const parsedSellingPrice = parseFloat(parseFormattedValue(masterSellingPrice));
              if (masterSellingPrice === "" || isNaN(parsedSellingPrice) || parsedSellingPrice < 0) {
-                 throw new Error("Master Selling Price is required and must be a non-negative number.");
+                 // --- MODIFIED ---
+                 throw new Error(t('error_selling_price_required'));
              }
-            // --- END: (4. อัปเดต) ---
 
-
-            // ... (processItem loop - คงเดิม) ...
             const { requiresSerialNumber, requiresMacAddress } = selectedModel.category;
             let errorMessages = [];
 
             const processItem = (item, identifier) => {
                 if (requiresSerialNumber && !item.serialNumber?.trim()) {
-                    errorMessages.push(`Serial Number is required for: ${identifier}`);
+                    // --- MODIFIED ---
+                    errorMessages.push(t('error_serial_required_for', { identifier }));
                 }
                 if (requiresMacAddress && !item.macAddress?.trim()) {
-                    errorMessages.push(`MAC Address is required for: ${identifier}`);
+                    // --- MODIFIED ---
+                    errorMessages.push(t('error_mac_required_for', { identifier }));
                 }
                 if (item.macAddress && !validateMacAddress(item.macAddress.trim())) {
-                    errorMessages.push(`Invalid MAC Address format for: ${identifier}`);
+                    // --- MODIFIED ---
+                    errorMessages.push(t('error_invalid_mac_for', { identifier }));
                 }
                 return {
                     serialNumber: item.serialNumber?.trim() || null,
-                    macAddress: item.macAddress?.trim() || null,
+                    macAddress: item.macAddress?.trim() ? item.macAddress.trim().replace(/[:-\s]/g, '') : null, // (แก้ไข: เพิ่ม .replace)
                     notes: item.notes?.trim() || null,
                 };
             };
@@ -287,10 +271,10 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
             }
 
             if (itemsPayload.length === 0) {
-                throw new Error("Please add at least one valid item to save.");
+                // --- MODIFIED ---
+                throw new Error(t('error_no_valid_items'));
             }
 
-            // (Payload - คงเดิม / เพราะเราใช้ตัวแปรที่ parse แล้ว)
             const payload = {
                 productModelId: selectedModel.id,
                 supplierId: parseInt(selectedSupplierId),
@@ -314,7 +298,6 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         }
     };
 
-    // (handleClose - คงเดิม)
     const handleClose = () => {
         setIsOpen(false);
         setSelectedModel(null);
@@ -330,13 +313,11 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
         <Dialog open={isOpen} onOpenChange={handleClose}>
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                    {/* ... (Header - คงเดิม) ... */}
                     <DialogTitle>{t('batch_add_inventory_title')}</DialogTitle>
                     <DialogDescription>{t('batch_add_inventory_description')}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* ... (Comboboxes - คงเดิม) ... */}
                         <div className="space-y-2">
                             <Label>{t('tableHeader_productModel')} <span className="text-red-500">*</span></Label>
                             <ProductModelCombobox onSelect={handleModelSelect} />
@@ -352,54 +333,54 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2 relative">
-                            <Label htmlFor="batchPurchasePrice">Purchase Price (Cost) per item <span className="text-red-500">*</span></Label>
-                            {/* --- START: (5. อัปเดต Input Field ของ Cost) --- */}
+                            {/* --- MODIFIED --- */}
+                            <Label htmlFor="batchPurchasePrice">{t('batch_purchase_price_label')} <span className="text-red-500">*</span></Label>
                             <Input 
                                 id="batchPurchasePrice" 
-                                type="text"              // <-- เปลี่ยนเป็น text
-                                inputMode="decimal"     // <-- เพิ่ม inputMode
-                                placeholder="Enter cost price..." 
+                                type="text"
+                                inputMode="decimal"
+                                placeholder={t('placeholder_enter_cost')} // (แนะนำให้เพิ่ม key นี้ด้วย)
                                 value={batchPurchasePrice}
-                                onChange={(e) => handlePriceChange(e, setBatchPurchasePrice)} // <-- ใช้ handler ใหม่
+                                onChange={(e) => handlePriceChange(e, setBatchPurchasePrice)} 
                                 disabled={isCostLoading || !selectedModel || !selectedSupplierId}
                             />
-                            {/* --- END: (5. อัปเดต) --- */}
                             {isCostLoading && (
                                 <div className="absolute right-2 top-7">
                                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                 </div>
                             )}
-                            <p className="text-xs text-muted-foreground">Smart Cost: Auto-fills last cost from this supplier.</p>
+                            {/* --- MODIFIED --- */}
+                            <p className="text-xs text-muted-foreground">{t('smart_cost_helper')}</p>
                         </div>
                         
                          <div className="space-y-2 relative">
-                            <Label htmlFor="masterSellingPrice">Master Selling Price <span className="text-red-500">*</span></Label>
-                            {/* --- START: (6. อัปเดต Input Field ของ Price) --- */}
+                            {/* --- MODIFIED --- */}
+                            <Label htmlFor="masterSellingPrice">{t('master_selling_price_label')} <span className="text-red-500">*</span></Label>
                             <Input 
                                 id="masterSellingPrice" 
-                                type="text"              // <-- เปลี่ยนเป็น text
-                                inputMode="decimal"     // <-- เพิ่ม inputMode
-                                placeholder="Enter selling price..." 
+                                type="text"
+                                inputMode="decimal"
+                                placeholder={t('placeholder_enter_selling_price')} // (แนะนำให้เพิ่ม key นี้ด้วย)
                                 value={masterSellingPrice}
-                                onChange={(e) => handlePriceChange(e, setMasterSellingPrice)} // <-- ใช้ handler ใหม่
+                                onChange={(e) => handlePriceChange(e, setMasterSellingPrice)} 
                                 disabled={!selectedModel}
                             />
-                            {/* --- END: (6. อัปเดต) --- */}
-                             <p className="text-xs text-muted-foreground">Smart Price: Auto-fills current price. Editing this updates the model.</p>
+                             {/* --- MODIFIED --- */}
+                             <p className="text-xs text-muted-foreground">{t('smart_price_helper')}</p>
                         </div>
                     </div>
 
-                    {/* ... (ส่วนที่เหลือของ JSX - คงเดิมทั้งหมด) ... */}
                     {selectedModel && (
                         <div>
                             <div className="flex justify-end gap-2 mb-4">
+                                {/* --- MODIFIED --- */}
                                 <Button variant="outline" size="sm" onClick={handleDownloadTemplate}>
                                     <Download className="mr-2 h-4 w-4" />
-                                    Download Template
+                                    {t('download_template_button')}
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={() => fileInputRef.current.click()}>
                                     <Upload className="mr-2 h-4 w-4" />
-                                    Import CSV
+                                    {t('import_csv_button')}
                                 </Button>
                                 <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
                             </div>
@@ -448,7 +429,10 @@ export default function BatchAddInventoryDialog({ isOpen, setIsOpen, onSave }) {
                                 ))}
                             </div>
                              <div className="flex justify-between items-center mt-3">
-                                <p className="text-xs text-muted-foreground">Showing {manualItems.length} of {MAX_ITEMS_MANUAL} rows.</p>
+                                {/* --- MODIFIED --- */}
+                                <p className="text-xs text-muted-foreground">
+                                    {t('showing_rows_count', { count: manualItems.length, max: MAX_ITEMS_MANUAL })}
+                                </p>
                                 <Button variant="outline" size="sm" onClick={addManualItemRow}>
                                     <PlusCircle className="mr-2 h-4 w-4" /> {t('add_row_button')}
                                 </Button>

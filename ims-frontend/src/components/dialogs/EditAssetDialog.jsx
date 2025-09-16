@@ -27,7 +27,21 @@ const validateMacAddress = (mac) => {
   return macRegex.test(mac);
 };
 
-// ... (Asset statuses remain the same) ...
+// --- START: (Helpers สำหรับจัดรูปแบบราคา) ---
+const parseFormattedValue = (val) => String(val || '').replace(/,/g, '');
+
+const handlePriceChange = (e, setter) => {
+    const { value } = e.target;
+    const rawValue = parseFormattedValue(value);
+
+    if (rawValue === '' || /^[0-9]*\.?[0-9]*$/.test(rawValue)) {
+        const parts = rawValue.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        setter(parts.join('.'));
+    }
+};
+// --- END: (Helpers สำหรับจัดรูปแบบราคา) ---
+
 const ASSET_STATUSES = [
   "IN_WAREHOUSE",
   "ASSIGNED",
@@ -42,7 +56,6 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
     const [isLoading, setIsLoading] = useState(false);
     const [isFetching, setIsFetching] = useState(false);
     
-    // --- START: PHASE 6 (1. เพิ่ม purchasePrice ใน state) ---
     const [formData, setFormData] = useState({
         assetCode: '',
         serialNumber: '',
@@ -51,7 +64,6 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
         status: '',
         purchasePrice: '' 
     });
-    // --- END: PHASE 6 ---
     
     const [selectedModel, setSelectedModel] = useState(null);
     const [selectedSupplierId, setSelectedSupplierId] = useState("");
@@ -85,16 +97,14 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
                     const assetData = response.data;
                     setAsset(assetData);
                     
-                    // --- START: PHASE 6 (2. Set purchasePrice ใน form data) ---
                     setFormData({
                         assetCode: assetData.assetCode || '',
                         serialNumber: assetData.serialNumber || '',
                         macAddress: formatMacAddress(assetData.macAddress) || '',
                         notes: assetData.notes || '',
                         status: assetData.status || '',
-                        purchasePrice: assetData.purchasePrice || '' 
+                        purchasePrice: assetData.purchasePrice ? assetData.purchasePrice.toLocaleString('en-US') : '' 
                     });
-                    // --- END: PHASE 6 ---
                     
                     setSelectedModel(assetData.productModel);
                     setSelectedSupplierId(assetData.supplierId ? String(assetData.supplierId) : "");
@@ -111,6 +121,9 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
     
     const handleChange = (e) => {
         const { id, value } = e.target;
+
+        if (id === 'purchasePrice') return;
+
         let processedValue = value;
         if (id === 'macAddress') {
             processedValue = formatMacAddress(value);
@@ -118,6 +131,12 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
             processedValue = value.toUpperCase();
         }
         setFormData(prev => ({ ...prev, [id]: processedValue }));
+    };
+
+    const handleCostChange = (e) => {
+        handlePriceChange(e, (value) => {
+            setFormData(prev => ({ ...prev, purchasePrice: value }));
+        });
     };
 
     const handleStatusChange = (value) => {
@@ -162,28 +181,24 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
             return;
         }
 
-        // --- START: PHASE 6 (3. ตรวจสอบ purchasePrice) ---
-        const parsedPurchasePrice = parseFloat(purchasePrice);
+        const parsedPurchasePrice = parseFloat(parseFormattedValue(purchasePrice));
         if (purchasePrice !== '' && (isNaN(parsedPurchasePrice) || parsedPurchasePrice < 0)) {
             toast.error("Purchase Price must be a valid non-negative number.");
             setIsLoading(false);
             return;
         }
-        // --- END: PHASE 6 ---
 
         try {
-            // --- START: PHASE 6 (4. เพิ่ม purchasePrice และ supplierId ใน payload) ---
             const payload = {
                 productModelId: selectedModel.id,
                 supplierId: parseInt(selectedSupplierId),
                 assetCode: assetCode.trim(),
                 serialNumber: serialNumber.trim() || null,
-                macAddress: macAddress.trim() || null,
+                macAddress: macAddress.trim() ? macAddress.trim().replace(/[:-\s]/g, '') : null,
                 notes: notes.trim() || null,
                 status: status,
                 purchasePrice: purchasePrice ? parsedPurchasePrice : null
             };
-            // --- END: PHASE 6 ---
             
             await axiosInstance.put(`/assets/${assetId}`, payload, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -205,7 +220,6 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
         setAsset(null);
         setSelectedModel(null);
         setSelectedSupplierId("");
-        // Reset form data
         setFormData({
             assetCode: '', serialNumber: '', macAddress: '', notes: '', status: '', purchasePrice: ''
         });
@@ -259,27 +273,29 @@ export default function EditAssetDialog({ assetId, isOpen, setIsOpen, onSave }) 
                             </div>
                         </div>
 
-                        {/* --- START: PHASE 6 (5. เพิ่มช่องกรอก Supplier และ Purchase Price) --- */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div className="space-y-2">
                                 <Label htmlFor="supplier">{t('supplier_label')} <span className="text-red-500">*</span></Label>
                                 <SupplierCombobox
                                     selectedValue={selectedSupplierId}
                                     onSelect={(supplier) => setSelectedSupplierId(supplier ? String(supplier.id) : "")}
+                                    initialSupplier={asset?.supplier}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="purchasePrice">Purchase Price (Cost)</Label>
+                                {/* --- START: MODIFIED (เปลี่ยน Label เป็น t()) --- */}
+                                <Label htmlFor="purchasePrice">{t('purchase_price_label')}</Label>
+                                {/* --- END: MODIFIED --- */}
                                 <Input 
                                     id="purchasePrice" 
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="Enter cost price..."
                                     value={formData.purchasePrice} 
-                                    onChange={handleChange} 
+                                    onChange={handleCostChange} 
                                 />
                             </div>
                         </div>
-                        {/* --- END: PHASE 6 --- */}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
