@@ -1,8 +1,8 @@
 // src/components/ui/ProductModelCombobox.jsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axiosInstance from '@/api/axiosInstance';
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/popover";
 import useAuthStore from "@/store/authStore";
 import { toast } from "sonner";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { useTranslation } from "react-i18next";
 
 function useDebounce(value, delay) {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -32,50 +32,100 @@ function useDebounce(value, delay) {
 }
 
 export function ProductModelCombobox({ onSelect, initialModel }) {
-  const { t } = useTranslation(); // --- 2. เรียกใช้ Hook ---
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState([]);
   const [selectedModelDisplay, setSelectedModelDisplay] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isSearching, setIsSearching] = useState(false); 
+
   const token = useAuthStore((state) => state.token);
   const debouncedSearch = useDebounce(searchQuery, 500);
 
   useEffect(() => {
     if (initialModel) {
       setSelectedModelDisplay(initialModel);
-      setResults([initialModel]);
+      if (!results.some(r => r.id === initialModel.id)) {
+           setResults(prev => [initialModel, ...prev.filter(p => p.id !== initialModel.id)]);
+      }
     } else {
       setSelectedModelDisplay(null);
-      setResults([]);
     }
+    // (เราเอา results ออกจาก dependency array นี้ เพื่อป้องกันการ reset ค่าโดยไม่จำเป็น)
   }, [initialModel]);
 
-  useEffect(() => {
-    if (!open) {
-      setSearchQuery("");
-      return;
+
+  // --- START: MODIFIED (แก้ไขจุดนี้) ---
+  const fetchModels = useCallback(async (pageNum, isSearchChange = false) => {
+    if (isSearchChange) {
+      setIsSearching(true); 
+    } else {
+      setIsLoading(true); 
     }
 
-    const fetchModels = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axiosInstance.get("/product-models", {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { search: debouncedSearch, limit: 10 },
-        });
-        setResults(response.data.data);
-      } catch (error) {
-        toast.error("Failed to search for product models.");
-        setResults([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    try {
+      const response = await axiosInstance.get("/product-models", {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { 
+            search: debouncedSearch, 
+            limit: 20,
+            page: pageNum 
+        },
+      });
+      
+      const { data, totalPages: newTotalPages } = response.data;
+
+      setResults(prev => isSearchChange ? data : [...prev, ...data]);
+      setPage(pageNum);
+      setTotalPages(newTotalPages);
+
+    } catch (error) {
+      toast.error(t('error_fetch_models'));
+      // (เพิ่มการเคลียร์ค่าตอน Error ด้วย functional update)
+      setResults(prev => isSearchChange ? [] : prev); 
+    } finally {
+       setIsSearching(false);
+       setIsLoading(false);
+    }
+  }, [debouncedSearch, token, t]); // <-- *** แก้ไข: เอา 'results' ออกจาก array นี้ ***
+  // --- END: MODIFIED ---
+
+
+  useEffect(() => {
+    if (open) {
+      fetchModels(1, true);
+    } else {
+      // Reset state เมื่อปิด
+      setSearchQuery("");
+      // (เมื่อปิด ให้ใช้ค่า initialModel เป็นค่าเริ่มต้นใน list เสมอ)
+      setResults(initialModel ? [initialModel] : []); 
+      setPage(1);
+      setTotalPages(1);
+    }
+    // (เราเอา fetchModels และ initialModel ออก เพื่อให้ useEffect นี้ทำงานเฉพาะตอน open/close)
+    // (ตรรกะการ fetch เมื่อ search เปลี่ยน ถูกจัดการโดย debouncedSearch ที่เป็น dependency ของ fetchModels แล้ว)
+  }, [open]); 
+  
+  // (แยก useEffect สำหรับการค้นหาโดยเฉพาะ)
+  useEffect(() => {
+    if (open) {
+        fetchModels(1, true);
+    }
+  }, [debouncedSearch, fetchModels, open]);
+
+
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     
-    fetchModels();
-    
-  }, [debouncedSearch, open, token]);
+    if (scrollHeight - scrollTop - clientHeight < 50 && !isLoading && page < totalPages) {
+      fetchModels(page + 1);
+    }
+  };
+
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -98,17 +148,22 @@ export function ProductModelCombobox({ onSelect, initialModel }) {
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList>
-            {isLoading && <div className="p-2 text-sm text-center">Loading...</div>}
-            <CommandEmpty>No product model found.</CommandEmpty>
+          <CommandList onScroll={handleScroll}>
+            {isSearching && <div className="p-2 text-sm text-center">{t('loading')}</div>}
+            
+            {!isSearching && results.length === 0 && <CommandEmpty>{t('no_product_model_found')}</CommandEmpty>}
+
             <CommandGroup>
               {results.map((model) => (
                 <CommandItem
                   key={model.id}
-                  value={model.modelNumber}
-                  onSelect={() => {
-                    onSelect(model); 
-                    setSelectedModelDisplay(model);
+                  value={model.modelNumber} 
+                  onSelect={(currentValue) => {
+                    const selected = results.find(r => 
+                        r.modelNumber.toLowerCase() === currentValue.toLowerCase()
+                    );
+                    onSelect(selected || model); 
+                    setSelectedModelDisplay(selected || model);
                     setOpen(false);
                   }}
                 >
@@ -122,6 +177,14 @@ export function ProductModelCombobox({ onSelect, initialModel }) {
                 </CommandItem>
               ))}
             </CommandGroup>
+            
+            {isLoading && (
+                 <div className="flex items-center justify-center p-2 text-xs text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('loading_more')}
+                </div>
+            )}
+
           </CommandList>
         </Command>
       </PopoverContent>

@@ -675,5 +675,9 @@
   "error_invalid_mac_for": "รูปแบบ MAC Address ไม่ถูกต้องสำหรับ: {{identifier}}",
   "error_no_valid_items": "กรุณาเพิ่มรายการที่ถูกต้องอย่างน้อย 1 รายการ",
   "error_asset_code_required_for": "จำเป็นต้องระบุ Asset Code",
-  "error_no_valid_assets": "กรุณาเพิ่ม Asset ที่ถูกต้องอย่างน้อย 1 รายการ"
+  "error_no_valid_assets": "กรุณาเพิ่ม Asset ที่ถูกต้องอย่างน้อย 1 รายการ",
+  "loading": "กำลังโหลด...",
+  "no_product_model_found": "ไม่พบโมเดลสินค้า",
+  "no_supplier_found": "ไม่พบซัพพลายเออร์",
+  "loading_more": "กำลังโหลดเพิ่ม..."
 }

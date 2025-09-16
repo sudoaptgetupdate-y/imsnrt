@@ -675,5 +675,9 @@
   "error_invalid_mac_for": "Invalid MAC Address format for: {{identifier}}",
   "error_no_valid_items": "Please add at least one valid item to save.",
   "error_asset_code_required_for": "Asset Code is required.",
-  "error_no_valid_assets": "Please add at least one valid asset to save."
+  "error_no_valid_assets": "Please add at least one valid asset to save.",
+  "loading": "Loading...",
+  "no_product_model_found": "No product model found.",
+  "no_supplier_found": "No supplier found.",
+  "loading_more": "Loading more..."
 }
