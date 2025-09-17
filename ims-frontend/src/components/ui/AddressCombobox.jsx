@@ -1,10 +1,10 @@
 // src/components/ui/AddressCombobox.jsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // (1) เพิ่ม useCallback
 import axiosInstance from '@/api/axiosInstance';
 import useAuthStore from "@/store/authStore";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2 } from "lucide-react"; // (1) เพิ่ม Loader2
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useTranslation } from "react-i18next"; // --- 1. Import useTranslation ---
+import { useTranslation } from "react-i18next";
 
 function useDebounce(value, delay) {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -32,104 +32,175 @@ function useDebounce(value, delay) {
 }
 
 export function AddressCombobox({ selectedValue, onSelect, initialAddress }) {
-  const { t } = useTranslation(); // --- 2. เรียกใช้ Hook ---
+  const { t } = useTranslation();
   const token = useAuthStore((state) => state.token);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
+  
+  // (2) เพิ่ม States สำหรับ Pagination
   const [isLoading, setIsLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
   const [selectedAddressDisplay, setSelectedAddressDisplay] = useState(null);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
+  // (5) ปรับปรุง useEffect นี้ให้เหมือน SupplierCombobox
   useEffect(() => {
     if (initialAddress) {
       setSelectedAddressDisplay(initialAddress);
-      if(!searchQuery){
-        setSearchResults([initialAddress]);
+      if (!searchResults.some(r => r.id === initialAddress.id)) {
+           setSearchResults(prev => [initialAddress, ...prev.filter(p => p.id !== initialAddress.id)]);
       }
+    } else {
+        setSelectedAddressDisplay(null);
     }
   }, [initialAddress]);
 
-  useEffect(() => {
-    if (!open) {
-      setSearchQuery("");
-      return;
-    }
 
-    const fetchAddresses = async () => {
+  // (4) สร้าง fetchAddresses ใหม่
+  const fetchAddresses = useCallback(async (pageNum, isSearchChange = false) => {
+    if (isSearchChange) {
+      setIsSearching(true);
+    } else {
       setIsLoading(true);
-      try {
-        const response = await axiosInstance.get("/addresses", {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { search: debouncedSearchQuery, limit: 10 },
-        });
-        setSearchResults(response.data.data);
-      } catch (error) {
-        toast.error("Failed to search for addresses.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    }
+    
+    try {
+      const response = await axiosInstance.get("/addresses", { // <-- Endpoint
+        headers: { Authorization: `Bearer ${token}` },
+        params: { 
+            search: debouncedSearchQuery, 
+            limit: 20, // (3) เปลี่ยน limit เป็น 20
+            page: pageNum
+        },
+      });
 
-    fetchAddresses();
-  }, [debouncedSearchQuery, open, token]);
+      const { data, totalPages: newTotalPages } = response.data;
+      
+      setSearchResults(prev => isSearchChange ? data : [...prev, ...data]);
+      setPage(pageNum);
+      setTotalPages(newTotalPages);
+
+    } catch (error) {
+      toast.error(t('error_fetch_addresses', 'Failed to search for addresses.'));
+      setSearchResults(prev => isSearchChange ? [] : prev);
+    } finally {
+      setIsSearching(false);
+      setIsLoading(false);
+    }
+  }, [debouncedSearchQuery, token, t]);
   
+
+  // (5) แยก useEffect สำหรับการเปิด/ปิด
+  useEffect(() => {
+    if (open) {
+      // (ไม่ต้อง fetch ที่นี่)
+    } else {
+      setSearchQuery("");
+      setSearchResults(initialAddress ? [initialAddress] : []);
+      setPage(1);
+      setTotalPages(1);
+    }
+  }, [open, initialAddress]);
+
+  // (5) แยก useEffect สำหรับการ Search
+  useEffect(() => {
+    if (open) {
+        fetchAddresses(1, true);
+    }
+  }, [debouncedSearchQuery, open, fetchAddresses]);
+  
+  // (5) useEffect สำหรับ sync selectedValue
   useEffect(() => {
     if (selectedValue) {
-        const address = searchResults.find(a => String(a.id) === selectedValue);
+        const address = searchResults.find(a => String(a.id) === String(selectedValue));
         if(address) {
             setSelectedAddressDisplay(address);
+        } else if (initialAddress && String(initialAddress.id) === String(selectedValue)) {
+            setSelectedAddressDisplay(initialAddress);
         }
     } else {
         setSelectedAddressDisplay(null);
     }
-  }, [selectedValue, searchResults]);
+  }, [selectedValue, searchResults, initialAddress]);
+
+
+  // (6) เพิ่ม handleScroll
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 50 && !isLoading && page < totalPages) {
+      fetchAddresses(page + 1);
+    }
+  };
 
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between">
           <span className="truncate">
-            {selectedValue && selectedAddressDisplay
+            {selectedAddressDisplay
               ? selectedAddressDisplay.name
               : t('select_address')}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t('address_search_placeholder')}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList>
-            {isLoading && <div className="p-2 text-center text-sm">Loading...</div>}
-            <CommandEmpty>No address found.</CommandEmpty>
+          {/* (7) เพิ่ม onScroll และ loading states */}
+          <CommandList onScroll={handleScroll} onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
+            {isSearching && <div className="p-2 text-center text-sm">{t('loading')}</div>}
+            
+            {!isSearching && searchResults.length === 0 && <CommandEmpty>{t('no_address_found', 'No address found.')}</CommandEmpty>}
+            
             <CommandGroup>
               {searchResults.map((address) => (
                 <CommandItem
                   key={address.id}
-                  value={String(address.id)}
-                  onSelect={() => {
-                     onSelect(String(address.id));
-                     setSelectedAddressDisplay(address);
+                  value={String(address.name)} // (7) ใช้ name
+                  onSelect={(currentValue) => {
+                     const selected = searchResults.find(a => 
+                        a.name.toLowerCase() === currentValue.toLowerCase()
+                     );
+                     
+                     if (selected) {
+                        onSelect(String(selected.id)); // (7) ส่ง ID กลับ
+                        setSelectedAddressDisplay(selected);
+                     } else {
+                        onSelect(String(address.id));
+                        setSelectedAddressDisplay(address);
+                     }
                      setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      selectedValue === String(address.id) ? "opacity-100" : "opacity-0"
+                      selectedValue === String(address.id) ? "opacity-100" : "opacity-0" // (7) เปรียบเทียบด้วย ID
                     )}
                   />
                   {address.name}
                 </CommandItem>
               ))}
             </CommandGroup>
+
+            {/* (8) เพิ่มตัว Loading "loading more" */}
+            {isLoading && (
+                 <div className="flex items-center justify-center p-2 text-xs text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t('loading_more', 'Loading more...')}
+                </div>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
