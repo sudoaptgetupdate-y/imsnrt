@@ -21,6 +21,6 @@ router.patch('/:id/status', superAdminOnly, userController.updateUserStatus);
 router.delete('/:id', superAdminOnly, userController.deleteUser);
 router.get('/:id/assets', superAdminOnly, userController.getUserAssets);
 router.get('/:id/assets/summary', superAdminOnly, userController.getUserAssetSummary);
-router.get('/:id/active-assets', superAdminOnly, userController.getActiveAssetsForUser); // <-- เพิ่มบรรทัดนี้
+router.get('/:id/active-assets', superAdminOnly, userController.getActiveAssetsForUser); 
 
 module.exports = router;

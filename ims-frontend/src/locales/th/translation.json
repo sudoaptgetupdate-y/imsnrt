@@ -679,5 +679,10 @@
   "loading": "กำลังโหลด...",
   "no_product_model_found": "ไม่พบโมเดลสินค้า",
   "no_supplier_found": "ไม่พบซัพพลายเออร์",
-  "loading_more": "กำลังโหลดเพิ่ม..."
+  "loading_more": "กำลังโหลดเพิ่ม...",
+  "placeholder_enter_cost": "ระบุราคาต้นทุน...",
+  "placeholder_enter_selling_price": "ระบุราคาขาย...",
+  "master_search": "ค้นหาสินค้าทั้งหมด",
+  "currently_assigned_assets_title": "ทรัพย์สินที่อยู่ในความครอบครอง(ปัจจุบัน)",
+  "currently_assigned_assets_desc": "รายการทรัพย์สินของบริษัทที่อยู่ในความดูแลของคุณ"
 }

@@ -679,5 +679,10 @@
   "loading": "Loading...",
   "no_product_model_found": "No product model found.",
   "no_supplier_found": "No supplier found.",
-  "loading_more": "Loading more..."
+  "loading_more": "Loading more...",
+  "placeholder_enter_cost": "Enter cost price...",
+  "placeholder_enter_selling_price": "Enter selling price...",
+  "master_search": "Master Search",
+  "currently_assigned_assets_title": "Currently Assigned Assets",
+  "currently_assigned_assets_desc": "A list of assets currently assigned to this user."
 }

@@ -48,7 +48,7 @@ export default function UserActiveAssetsPage() {
             if (!userId || !token) return;
             try {
                 const [assetsRes, userRes] = await Promise.all([
-                    axiosInstance.get(`/users/${userId}/assets/active`, { headers: { Authorization: `Bearer ${token}` } }),
+                    axiosInstance.get(`/users/${userId}/active-assets`, { headers: { Authorization: `Bearer ${token}` } }),
                     axiosInstance.get(`/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } })
                 ]);
                 setActiveAssets(assetsRes.data);
@@ -98,12 +98,12 @@ export default function UserActiveAssetsPage() {
                             </thead>
                             <tbody>
                                 {activeAssets.length > 0 ? activeAssets.map(h => (
-                                    <tr key={`${h.assignmentId}-${h.inventoryItemId}`} className="border-b">
-                                        <td className="p-2 font-semibold">{h.inventoryItem.assetCode}</td>
-                                        <td className="p-2">{h.inventoryItem.productModel.modelNumber}</td>
-                                        <td className="p-2">{h.inventoryItem.serialNumber}</td>
+                                    <tr key={`${h.assignmentId}-${h.id}`} className="border-b">
+                                        <td className="p-2 font-semibold">{h.assetCode}</td>
+                                        <td className="p-2">{h.productModel.modelNumber}</td>
+                                        <td className="p-2">{h.serialNumber}</td>
                                         {/* --- START: 4. ใช้งานวันที่ที่จัดรูปแบบแล้ว (ตาราง) --- */}
-                                        <td className="p-2">{formatDateByLocale(h.assignedAt, i18n.language)}</td>
+                                        <td className="p-2">{formatDateByLocale(h.assignedDate, i18n.language)}</td>
                                         {/* --- END --- */}
                                     </tr>
                                 )) : (

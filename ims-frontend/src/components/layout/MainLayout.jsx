@@ -170,7 +170,7 @@ const MainLayout = () => {
                     </p>
                      <div className="space-y-1">
                         <NavItem to="/inventory" icon={<Package size={18}/>} text={t('inventory')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
-                        <NavItem to="/master-search" icon={<FileSearch size={18}/>} text="ค้นหาสินค้าทั้งหมด" isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
+                        <NavItem to="/master-search" icon={<FileSearch size={18}/>} text={t('master_search')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/assets" icon={<Package size={18}/>} text={t('assetList')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/product-models" icon={<Boxes size={18}/>} text={t('models')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
                         <NavItem to="/brands" icon={<Building2 size={18}/>} text={t('brands')} isCollapsed={isSidebarCollapsed} onClick={handleNavLinkClick} />
