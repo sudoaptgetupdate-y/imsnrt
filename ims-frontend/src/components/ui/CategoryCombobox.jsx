@@ -88,7 +88,7 @@ export function CategoryCombobox({ selectedValue, onSelect, initialCategory }) {
 
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button variant="outline" role="combobox" className="w-full justify-between">
           <span className="truncate">
@@ -99,14 +99,14 @@ export function CategoryCombobox({ selectedValue, onSelect, initialCategory }) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t('category_search_placeholder')}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList>
+          <CommandList onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
             {isLoading && <div className="p-2 text-center text-sm">Loading...</div>}
             <CommandEmpty>No category found.</CommandEmpty>
             <CommandGroup>

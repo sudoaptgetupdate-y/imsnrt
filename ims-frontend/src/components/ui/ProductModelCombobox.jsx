@@ -128,7 +128,7 @@ export function ProductModelCombobox({ onSelect, initialModel }) {
 
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -141,14 +141,14 @@ export function ProductModelCombobox({ onSelect, initialModel }) {
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
         <Command shouldFilter={false}>
           <CommandInput
             placeholder={t('product_model_search_placeholder')}
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
-          <CommandList onScroll={handleScroll}>
+          <CommandList onScroll={handleScroll} onWheelCapture={(e) => e.stopPropagation()} onTouchMoveCapture={(e) => e.stopPropagation()}>
             {isSearching && <div className="p-2 text-sm text-center">{t('loading')}</div>}
             
             {!isSearching && results.length === 0 && <CommandEmpty>{t('no_product_model_found')}</CommandEmpty>}
